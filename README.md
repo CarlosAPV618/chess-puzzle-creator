@@ -1,29 +1,52 @@
-# Create T3 App
+# Chess Puzzle Creator
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Analiza tus partidas de ajedrez y practica **tus propios errores**. Importa desde PGN, un link de Lichess o Chess.com, o un usuario de esas plataformas. Stockfish corre en tu navegador, clasifica cada jugada al estilo chess.com (incluidas las **brillantes**) y convierte los blunders, las oportunidades perdidas y las brillantes de tus partidas, tuyas y de tus rivales, en ejercicios con repetición espaciada.
 
-## What's next? How do I make an app with this?
+**Demo:** https://chess-puzzle-creator.vercel.app
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+## Funciones
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+- **Importar:** PGN (una o varias partidas), link de partida de Lichess o Chess.com, o las últimas N partidas de un usuario.
+- **Analizar en tu dispositivo:** Stockfish 19 (WASM) en un Web Worker. Muestra barra de evaluación, gráfica, mejor jugada, precisión e iconos de clasificación.
+- **Clasificación:** Brillante, Gran jugada, Mejor, Excelente, Buena, Teoría, Forzada, Imprecisión, Error, Oportunidad perdida y Blunder.
+- **Practicar:** ejercicios de "Corrige el error" y "Encuentra la brillante", con repetición espaciada (cajas de Leitner).
+- **Repasar partida:** reintenta cualquier jugada mala, como en el "Retry" de chess.com.
+- **PWA instalable:** analiza un PGN pegado incluso sin conexión.
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+## Stack
 
-## Learn More
+Next.js 15 (App Router) · tRPC · Drizzle + Postgres (Neon) · Better Auth · Tailwind 4 · react-chessboard · chess.js · Stockfish.js · Serwist. Gestor de paquetes: **pnpm**.
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+El plan completo (propuesta, diseño, specs y tareas) está en [`openspec/changes/add-chess-analyzer/`](openspec/changes/add-chess-analyzer/).
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+## Desarrollo
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+```bash
+pnpm install
+cp .env.example .env          # llena DATABASE_URL, DATABASE_URL_POOLED y BETTER_AUTH_SECRET
+pnpm db:migrate               # aplica las migraciones (conexión directa)
+pnpm dev
+```
 
-## How do I deploy this?
+| Script | Qué hace |
+|---|---|
+| `pnpm dev` / `pnpm build` / `pnpm start` | Next.js |
+| `pnpm typecheck` | TypeScript sin emitir |
+| `pnpm db:test:up` | Postgres local para tests (docker, `localhost:5435`) |
+| `pnpm test` | Tests (`node --test`); los de servidor usan solo `DATABASE_URL_TEST` local |
+| `pnpm db:generate` / `pnpm db:migrate` | Migraciones de Drizzle (nunca `db:push`) |
+| `pnpm build:openings` | Regenera el libro de aperturas desde lichess-org/chess-openings |
+| `pnpm reset-password <email>` | Restablece la contraseña de un usuario (no hay correo) |
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+El registro no verifica el correo y está limitado a 20 cuentas (fila `max_users` de `app_config`).
+
+## Licencia
+
+**GPL-3.0**: ver [LICENSE](LICENSE).
+
+## Créditos
+
+- [Stockfish](https://github.com/official-stockfish/Stockfish) (GPL-3.0), compilado a WebAssembly por [stockfish.js](https://github.com/nmrugg/stockfish.js) (GPL-3.0). Los binarios están en `public/engine/`.
+- La clasificación de jugadas y la detección de sacrificios (Brillante) son un port de [WintrChess](https://github.com/WintrCat/wintrchess) (GPL-3.0) de WintrCat. Cada archivo portado indica su origen.
+- El libro de aperturas viene de [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings) (CC0).
+- Las fórmulas de probabilidad de victoria y de precisión son las de [Lichess](https://lichess.org/page/accuracy).

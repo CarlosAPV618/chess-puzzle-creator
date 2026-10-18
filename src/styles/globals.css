@@ -1,6 +1,97 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Superficies: verde casi negro, como fieltro de tablero */
+  --color-ink: #0d1310;
+  --color-panel: #151d18;
+  --color-raised: #1d2822;
+  --color-line: #2a3830;
+  --color-muted: #9aa89f;
+  --color-fg: #eef2ec;
+
+  /* Acentos */
+  --color-brand: #7fb24a;
+  --color-brand-strong: #96c95c;
+  --color-board-light: #e8ecd2;
+  --color-board-dark: #6b9450;
+
+  /* Clases de jugada (D10) */
+  --color-c-brilliant: #1fb5ad;
+  --color-c-great: #5b8fc4;
+  --color-c-best: #7fb24a;
+  --color-c-excellent: #66a83c;
+  --color-c-good: #98b97a;
+  --color-c-book: #a8835d;
+  --color-c-forced: #8b938e;
+  --color-c-inaccuracy: #f2c230;
+  --color-c-mistake: #f59a4a;
+  --color-c-miss: #ec6b9d;
+  --color-c-blunder: #f0442e;
+}
+
+html {
+  color-scheme: dark;
+  background: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #1f3a2366, transparent 60%),
+    var(--color-ink);
+  color: var(--color-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-strong);
+  outline-offset: 2px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-pop {
+  animation: pop-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop {
+    animation: none;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand px-4 font-semibold text-[#10200c] shadow-[0_2px_0_#4d7a26] transition hover:bg-brand-strong active:translate-y-px active:shadow-none disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-raised px-4 text-sm font-semibold text-fg ring-1 ring-line transition hover:bg-line active:translate-y-px disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted transition hover:bg-raised hover:text-fg;
+  }
+  .field {
+    @apply min-h-11 w-full rounded-lg border border-line bg-ink px-3 text-fg placeholder:text-muted/70 focus:border-brand focus:outline-none;
+  }
+  .card {
+    @apply rounded-xl border border-line/70 bg-panel;
+  }
 }

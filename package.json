@@ -9,9 +9,9 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --env-file-if-exists=.env --import tsx --test --test-concurrency=1 \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
+    "db:generate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs migrate",
+    "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
     "db:test:up": "docker compose up -d",
     "reset-password": "node --env-file-if-exists=.env --import tsx scripts/reset-password.ts",
     "build:openings": "node --import tsx scripts/build-openings.ts"

@@ -135,6 +135,11 @@ Transiciones con mate (reglas de WintrChess):
   - La pieza ya estaba atrapada antes (se iba a perder igual).
 - **Es Brillante** si queda ≥1 pieza colgada. Los sacrificios de peón nunca cuentan.
 - Hay falsos positivos conocidos en la versión de WintrChess. Para los ejercicios no basta: ver D4b.
+- *Implementación (port en `src/lib/classify/`, commit `d145b20` de WintrChess):*
+  - Una segunda línea con **mate a favor** también cuenta como "ya ganaba" (WintrChess solo mira cp ≥ 700). Evita el sacrificio con mate de todos modos; el costo conocido es que el mate de Philidor (`Qg8+!!`, cuya segunda línea es el mismo mate más largo) no sale Brillante.
+  - "Danger levels": se ignoran las capturas ilegales (el rey se contaba como capturador de una pieza defendida y eso convertía cualquier pieza en sacrificio) y la pieza que captura sí cuenta si queda colgada. El issue #5 de WintrChess solo trae una imagen; no se pudo confirmar que sea la misma falla.
+  - Desperado: si la pieza movida ya estaba insegura en su casilla de origen, no cuenta como pieza sacrificada.
+  - Una jugada solo es Teoría mientras la partida no haya salido del libro (sin "volver" por transposición), y nunca si la partida empieza desde otro FEN.
 
 **Brillante disponible (no jugada):** en cada posición donde el jugador **no** hizo la jugada del motor, se corre la misma detección sobre la jugada del motor (posición tras `bestUci`, con la eval de la línea 1). Si saldría Brillante, la jugada se marca `brilliantMissed`. No cambia la clase de lo que se jugó, pero alimenta los ejercicios (D9).
 
@@ -144,7 +149,7 @@ Transiciones con mate (reglas de WintrChess):
 
 Un Blunder sigue siendo Blunder: es más grave y de todos modos genera ejercicio. *Corrección:* la versión anterior pedía "EP mejor ≥ 0.80, EP tras la jugada < 0.65 y que no fuera ya Error ni Blunder". Eso es imposible, porque esa pérdida (≥ 0.15) ya es Error o Blunder por la tabla, así que la clase nunca habría salido.
 
-**Precisión por jugador:** la fórmula de Lichess. Por jugada, `acc = 103.1668 · e^(−0.04354 · (win%antes − win%después)) − 3.1669`, con win% de 0 a 100 desde el punto de vista del que mueve, limitada a [0, 100]. El total se redondea a un decimal. Lichess usa una media armónica ponderada por volatilidad; en el MVP basta la media simple, ajustable después.
+**Precisión por jugador:** la fórmula de Lichess. Por jugada, `acc = 103.1668 · e^(−0.04354 · (win%antes − win%después)) − 3.1669`, con win% de 0 a 100 desde el punto de vista del que mueve, limitada a [0, 100]. El total se redondea a un decimal. Lichess usa una media armónica ponderada por volatilidad; en el MVP basta la media simple, ajustable después. Cuando se juega la mejor jugada la pérdida es 0 (no la diferencia de evals entre dos búsquedas), para que una partida perfecta dé 100.
 
 ### D4b. Verificar los Brillantes antes de mostrarlos o volverlos ejercicio
 Un Brillante falso es un mal ejercicio: el usuario "encuentra" un sacrificio que en realidad pierde, o falla la respuesta cuando había otra igual de buena. Por eso cada candidato (jugado o `brilliantMissed`) pasa por una segunda verificación en el cliente antes de guardarse como Brillante:
@@ -152,6 +157,10 @@ Un Brillante falso es un mal ejercicio: el usuario "encuentra" un sacrificio que
 2. **Sacrificio sostenido.** Se sigue la línea principal 4 plies. El material del que sacrifica debe quedar abajo en ≥ 2 puntos en algún momento de la línea, o la pieza colgada debe poder capturarse con la eval del rival empeorando. Así se descartan "sacrificios" que en realidad son cambios diferidos.
 3. **Respuesta única para el ejercicio.** Solo se crea ejercicio si la segunda mejor jugada pierde ≥ 0.10 EP frente a la Brillante (criterio de Gran jugada). Si hay dos jugadas casi igual de buenas, la Brillante se muestra en el análisis pero no se vuelve ejercicio.
 4. **Conservador por defecto.** Ante cualquier duda (mates largos, posiciones con evals inestables entre profundidades > 0.05 EP), no se marca Brillante.
+5. *Implementación* (`src/lib/classify/verify.ts`, puro; el I/O está en `src/lib/engine/analyze-game.ts`):
+   - "Sostenido" = déficit ≥ 2 al final de los primeros **6** plies de la PV (o al final de la línea si es más corta, p. ej. mate); con 4 plies el "truco del tenedor" (Cxe5 Cxe5 d4) pasaba por sacrificio. Una PV inválida cuenta como no sostenido.
+   - Si la PV declina el sacrificio, se busca a profundidad 20 con `searchmoves` = capturas de la pieza colgada más valiosa. Pasa si capturar es peor para el rival que declinar (> 50 cp, o peor en mates).
+   - Mate a más de 15 = "mate largo", se descarta.
 
 La verificación solo corre sobre candidatos, que suelen ser 0–3 por partida. Como la detección de `brilliantMissed` revisa todas las jugadas que no fueron la del motor, en partidas caóticas podrían salir más. Se verifican **como máximo 6 candidatos por partida**: primero los del bando del usuario y luego los de mayor ganancia de EP. Los demás se descartan, no se marcan. A profundidad 22 cada verificación puede tardar decenas de segundos en el celular; se mide en la tarea 3.6.
 
@@ -197,6 +206,7 @@ WintrChess (github.com/WintrCat/wintrchess, **GPL-3.0**, 263 estrellas, último 
 - Se usa `lichess-org/chess-openings` (`dist/*.tsv` con EPD) [POR VERIFICAR licencia CC0]. Se procesa en build a un JSON `{ epd → { eco, name } }`, ~400 KB, que se carga de forma diferida.
 - Una jugada es Teoría si su posición resultante está en el libro. La comparación usa solo los tres primeros campos del FEN (piezas, turno y enroques) y descarta la casilla al paso: chess.js y el dataset pueden escribirla distinto y eso daría falsos negativos.
 - El nombre de la apertura de la partida es el de la última posición del libro alcanzada.
+- *Implementación:* `scripts/build-openings.ts` (`pnpm build:openings`) genera `src/lib/classify/openings.json` con 7 981 posiciones: las nombradas más las intermedias de cada línea, que heredan el último nombre. Pesa ~700 KB (~100 KB con gzip). Licencia CC0 verificada.
 
 ### D8. Modelo de datos (Drizzle)
 - **Tablas de Better Auth** (las genera su CLI).
@@ -284,7 +294,7 @@ El resto de las jugadas se practica dentro de la propia partida, sin banco de ej
 - **Persistencia:** no se guarda nada; es práctica libre. Funciona también sin cuenta, sobre un análisis en memoria.
 
 ### D10. UI y diseño
-- **Base:** Tailwind 4 + shadcn/ui, tema oscuro por defecto con verde tablero (paleta propia inspirada en chess.com, sin copiar sus assets). Se diseña desde 360 px de ancho.
+- **Base:** Tailwind 4 con componentes propios (sin shadcn: bastan unas clases `btn-*`/`field`/`card` en `globals.css`), tema oscuro por defecto con verde tablero (paleta propia inspirada en chess.com, sin copiar sus assets). Se diseña desde 360 px de ancho.
 - **Pantalla de análisis en móvil:**
   - De arriba abajo: jugador rival, tablero a todo el ancho con la barra de evaluación vertical delgada a la izquierda, jugador propio, gráfica de evaluación compacta (tocar un punto lleva a esa jugada), lista de jugadas horizontal desplazable y barra inferior fija con ⏮ ◀ ▶ ⏭.
   - Se navega con swipe sobre la gráfica y con las flechas del teclado.
@@ -370,7 +380,7 @@ Tests con `node --test` + `tsx`, como en QR-generator. Los de `lib/classify` y `
 - **Manifest** con `app/manifest.ts`, que Next soporta de forma nativa:
   - `display: standalone`, colores del tema e iconos 192, 512 y maskable;
   - `apple-touch-icon` y meta tags para iOS.
-- **Service worker** con Serwist (`@serwist/next`) [POR VERIFICAR compatibilidad con Next 15 y Turbopack en dev; si no, un `sw.js` escrito a mano].
+- **Service worker** con Serwist (`@serwist/next`), verificado con `next build` (webpack); desactivado en `next dev --turbo`. Se registra a mano (`register: false`) para el aviso de versión nueva, y `reloadOnOnline: false` para no perder un análisis en memoria al volver la red. El respaldo asm.js (3 MB) no se precachea; se cachea al usarse.
   - **Precache:** los binarios de Stockfish (`public/engine/`), el libro de aperturas, `/_next/static/*` y el HTML de las páginas públicas que funcionan sin red: `/` y `/analizar`.
   - **Network-only:** tRPC, `/api/*` (incluido auth) y las páginas con datos del usuario (`/partidas*`, `/practicar`). Así nunca se sirve desde caché HTML con datos de una sesión, ni se le muestra a otro usuario del mismo dispositivo.
   - Una navegación sin red a una página no cacheada muestra una página `/offline` precacheada.
@@ -388,6 +398,18 @@ Tests con `node --test` + `tsx`, como en QR-generator. Los de `lib/classify` y `
 - `BETTER_AUTH_URL`: `https://chess-puzzle-creator.vercel.app` en producción.
 
 El `src/env.js` de T3 se ajusta, porque por defecto solo pide `DATABASE_URL`.
+
+### Notas de implementación del servidor (2026-10-18)
+- **`games`** guarda además `start_fen`, `moves_uci[]` y `moves_san[]`, calculados en el servidor al importar (se reparsea el PGN con el mismo `parseGamePgn` del cliente; del cliente solo se toman `source`, `source_id`, `time_class`, `played_at` y `user_color`). `analysis.save` valida contra esa reproducción.
+- **`analyses`** guarda contadores por color (`mistakes_*` = Error+Blunder+Oportunidad perdida, `brilliants_*`) para "Mis partidas" sin leer el `jsonb`.
+- **`exercises.color`** (bando que mueve en `fen`) permite que `games.setUserColor` recalcule `side` con un solo `UPDATE`.
+- La tabla del rate limit de Better Auth se llama `auth_rate_limit` (modelo `rateLimit`), para no confundirla con `rate_limits`.
+- **Verificado:** el error del trigger llega desde Better Auth como `422 FAILED_TO_CREATE_USER`. Un hook `after` de `/sign-up/email` lo convierte en `403 SIGNUP_CLOSED` si el tope ya se alcanzó (test de carrera: los perdedores siempre reciben `SIGNUP_CLOSED`). Si el registro sigue abierto, el error no se enmascara.
+- **Verificado:** Better Auth toma la IP de `x-forwarded-for` y, sin `trustedProxies`, solo la acepta si trae una sola IP. Vercel sobrescribe esa cabecera con la IP real del cliente, así que no se puede falsificar ahí. El rate limit de Better Auth está activo también en dev/test.
+- **Verificado:** `chess.js` 1.4 acepta RAV, NAG y `0-0`, pero el parser usa su propio tokenizador para poder reportar "jugada ilegal en 14...Qxe4". `parsePgnText` es **async** (sha-256 con Web Crypto).
+- **Verificado (desde una IP residencial, no desde Vercel):** el callback de Chess.com responde `game.pgnHeaders.White/Black` y `game.endTime`; el archivo mensual contiene la partida por `url`. La API pública de Chess.com responde 403 (Cloudflare) sin `User-Agent`; el navegador siempre lo manda y la ruta envía uno propio. Falta comprobarlo desde Vercel (5.5).
+- **Leitner:** si llega un segundo resultado del mismo ejercicio en menos de 30 min, se registra el intento pero no se mueve la caja. Así la repetición de un fallo al final de la sesión no cuenta, aunque el cliente mande la llamada dos veces.
+- `practice.queue` también devuelve `bestPv`, `evalBefore` y `evalAfter`, que salen del análisis y se usan en la explicación.
 
 ## Risks / Trade-offs
 - **Análisis lento en celulares viejos:** a profundidad 16 con MultiPV 2, una partida de 40 jugadas puede tardar minutos con un solo hilo. Se mitiga con los presets, el progreso visible, que los resultados parciales se vayan mostrando y, más adelante, con multihilo o cloud eval de Lichess. Hay que medirlo (tarea 3.6).

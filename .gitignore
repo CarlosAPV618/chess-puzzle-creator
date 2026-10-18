@@ -36,3 +36,11 @@ yarn-error.log*
 *.tsbuildinfo
 # idea files
 .idea
+
+# serwist
+public/sw.js
+public/sw.js.map
+public/swe-worker-*
+.playwright-cli/
+.claude/*.lock
+.claude/settings.local.json

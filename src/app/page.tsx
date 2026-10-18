@@ -1,3 +1,5 @@
+import { ImportForm } from "./_components/import-form";
+
 export default function Home() {
-  return <main className="p-6">Chess Puzzle Creator</main>;
+  return <ImportForm />;
 }
