@@ -3,8 +3,9 @@
 import { ChevronLeft, Loader2, Puzzle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AnalysisControls } from "~/components/analysis-controls";
+import { CLASSIFIER_VERSION } from "~/lib/classify/version";
 import { netError } from "~/components/pwa";
 import { GameReview } from "~/components/review";
 import { useAnalysis } from "~/hooks/use-analysis";
@@ -20,7 +21,6 @@ export default function SavedGamePage() {
   const [fresh, setFresh] = useState<GameAnalysis | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<GameAnalysis | null>(null);
-  const autoRan = useRef(false);
 
   const game = q.data?.game;
   const analysis = fresh ?? q.data?.analysis ?? null;
@@ -46,13 +46,6 @@ export default function SavedGamePage() {
     await persist(a);
   }
 
-  // Sin análisis guardado: se analiza solo (Normal) y se guarda al terminar.
-  useEffect(() => {
-    if (!q.data || q.data.analysis || autoRan.current) return;
-    autoRan.current = true;
-    void analyze(16);
-  });
-
   if (q.isLoading) return <Loader2 className="mx-auto mt-16 size-6 animate-spin text-muted" aria-label="Cargando" />;
   if (!game)
     return (
@@ -75,6 +68,11 @@ export default function SavedGamePage() {
           {game.openingName && <span className="ml-2 text-sm font-normal text-muted">{game.openingName}</span>}
         </h1>
       </div>
+      {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
+        <p className="mb-3 rounded-lg bg-raised p-3 text-sm" role="status">
+          La clasificación mejoró desde que analizaste esta partida. Usa <strong>Reanalizar</strong> para actualizarla.
+        </p>
+      )}
       <GameReview
         game={game}
         analysis={analysis}

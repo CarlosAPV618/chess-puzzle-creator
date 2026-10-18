@@ -1,7 +1,7 @@
 "use client";
 
-import { FlipVertical2, GraduationCap, Lightbulb, RotateCcw, Undo2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { GraduationCap, Lightbulb, Play, RefreshCw, RotateCcw, Target, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Arrow } from "react-chessboard";
 import type { Color, Eval, GameAnalysis } from "~/lib/types";
 import { acceptedMoves, getEngine, judgeMove } from "~/hooks/use-engine";
@@ -40,7 +40,7 @@ const CLASS_PHRASE: Record<GameAnalysis["moves"][number]["class"], string> = {
   inaccuracy: "es una imprecisión",
   mistake: "es un error",
   miss: "es una oportunidad perdida",
-  blunder: "es un blunder",
+  blunder: "es un error grave",
 };
 
 /** Intento sobre la posición previa a la jugada `move` (Reintentar o momento clave del repaso). */
@@ -52,7 +52,15 @@ type Trial = {
   hint: boolean;
 };
 
-type ReviewMode = { side: Color; moments: number[]; results: Record<number, boolean>; finished: boolean };
+/** results: true acierto, false fallo, null continuó sin repasar. pending: jugada mala mostrada, esperando "Repasar" o "Continuar". */
+type ReviewMode = {
+  side: Color;
+  moments: number[];
+  results: Record<number, boolean | null>;
+  finished: boolean;
+  paused: boolean;
+  pending: number | null;
+};
 
 export function GameReview({
   game,
@@ -117,10 +125,12 @@ export function GameReview({
     return () => c.abort();
   }, [variant, game.startFen, game.movesUci]);
 
+  // Navegar a mano durante el repaso lo pausa; "Continuar repaso" retoma desde ahí.
   const goto = useCallback(
     (p: number) => {
       setVariant(null);
       setTrial(null);
+      setReview((r) => (r && !r.finished ? { ...r, paused: true, pending: null } : r));
       setPly(Math.max(0, Math.min(N, p)));
     },
     [N],
@@ -167,7 +177,7 @@ export function GameReview({
     const move = trial.move;
     setTrial(null);
     if (review) {
-      setReview({ ...review, results: { ...review.results, [move]: correct } });
+      setReview({ ...review, pending: null, results: { ...review.results, [move]: correct } });
     }
     setPly(move + 1);
   }
@@ -181,14 +191,16 @@ export function GameReview({
     setFlipped((side === "b") !== (baseOrientation === "black"));
     setVariant(null);
     setTrial(null);
-    setReview({ side, moments, results: {}, finished: false });
+    setReview({ side, moments, results: {}, finished: false, paused: false, pending: null });
     setPly(0);
   }
 
   useEffect(() => {
-    if (!review || review.finished || trial || variant) return;
-    if (review.moments.includes(ply) && review.results[ply] === undefined) {
-      startTrial(ply);
+    if (!review || review.finished || review.paused || review.pending !== null || trial || variant) return;
+    // Primero se muestra la jugada mala (ply = momento + 1) y se espera "Repasar" o "Continuar".
+    const m = ply - 1;
+    if (m >= 0 && review.moments.includes(m) && !(m in review.results)) {
+      setReview({ ...review, pending: m });
       return;
     }
     if (ply >= N) {
@@ -197,7 +209,7 @@ export function GameReview({
     }
     const t = setTimeout(() => setPly((p) => Math.min(N, p + 1)), 650);
     return () => clearTimeout(t);
-  }, [review, trial, variant, ply, N, startTrial]);
+  }, [review, trial, variant, ply, N]);
 
   // ---- Lo que se muestra ----
   const inVariant = !!variant && variantFens.length > 0;
@@ -227,7 +239,12 @@ export function GameReview({
   }
 
   const badge = trial
-    ? null
+    ? trial.tried && lastMove && (trial.status === "correct" || trial.status === "wrong")
+      ? {
+          square: lastMove.to,
+          cls: trial.status === "wrong" ? ("mistake" as const) : trial.tried === pos?.best?.uci ? ("best" as const) : ("excellent" as const),
+        }
+      : null
     : prevAnalysis && lastMove && !inVariant
       ? { square: lastMove.to, cls: prevAnalysis.class }
       : null;
@@ -240,6 +257,27 @@ export function GameReview({
     if (!variant && game.movesUci[ply] === uci) return setPly(ply + 1);
     setVariant(variant ? { ...variant, moves: [...variant.moves, uci] } : { base: ply, moves: [uci] });
   }
+
+  // Rueda del mouse sobre el tablero: abajo avanza, arriba retrocede (como chess.com y Lichess).
+  const boardRef = useRef<HTMLDivElement>(null);
+  const stepRef = useRef<(d: number) => void>(() => undefined);
+  stepRef.current = (d) => {
+    if (!trial) goto(ply + d);
+  };
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    let acc = 0;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      acc += e.deltaY;
+      if (Math.abs(acc) < 40) return;
+      stepRef.current(acc > 0 ? 1 : -1);
+      acc = 0;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const topIsWhite = orientation === "black";
   const player = (white: boolean) => (
@@ -256,7 +294,7 @@ export function GameReview({
       {/* Columna del tablero */}
       <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-9rem))]">
         {player(topIsWhite)}
-        <div className="flex gap-1.5">
+        <div ref={boardRef} className="flex gap-1.5">
           <EvalBar value={shownEval} fen={fen} orientation={orientation} />
           <div className="min-w-0 flex-1">
             <Board
@@ -276,6 +314,8 @@ export function GameReview({
 
       {/* Panel */}
       <div className="flex min-w-0 flex-col gap-3">
+        {/* Sin análisis, los controles (profundidad + Analizar) van primero para que se vean sin bajar. */}
+        {!analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
         {trial ? (
           <TrialPanel
             trial={trial}
@@ -300,13 +340,45 @@ export function GameReview({
           />
         ) : review?.finished ? (
           <div className="rounded-lg bg-panel p-4 text-center">
-            <p className="text-lg font-bold">
-              Acertaste {Object.values(review.results).filter(Boolean).length} de {review.moments.length}
-            </p>
-            <button type="button" onClick={() => setReview(null)} className="btn-primary mt-3 w-full">
+            {review.moments.length === 0 ? (
+              <>
+                <p className="text-lg font-bold">
+                  Sin jugadas que repasar de {review.side === "w" ? game.white : game.black}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => startReview(review.side === "w" ? "b" : "w")}
+                  className="btn-primary mt-3 w-full"
+                >
+                  Repasar las de {review.side === "w" ? game.black : game.white}
+                </button>
+              </>
+            ) : (
+              <p className="text-lg font-bold">
+                Acertaste {Object.values(review.results).filter((r) => r === true).length} de {review.moments.length}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setReview(null)}
+              className={`${review.moments.length === 0 ? "btn-secondary" : "btn-primary"} mt-2 w-full`}
+            >
               Terminar repaso
             </button>
           </div>
+        ) : review && review.pending !== null ? (
+          <PendingPanel
+            san={sans[review.pending]!}
+            cls={analysis?.moves[review.pending]?.class ?? "mistake"}
+            who={review.side === game.userColor ? "Tu jugada" : `Jugada de ${review.side === "w" ? game.white : game.black}`}
+            brilliant={!!analysis?.moves[review.pending]?.brilliantMissed}
+            onReview={() => {
+              const m = review.pending!;
+              setReview({ ...review, pending: null });
+              startTrial(m);
+            }}
+            onContinue={() => setReview({ ...review, pending: null, results: { ...review.results, [review.pending!]: null } })}
+          />
         ) : inVariant ? (
           <div className="flex items-center justify-between gap-2 rounded-lg bg-panel p-3">
             <span className="text-sm text-muted">
@@ -328,6 +400,15 @@ export function GameReview({
           )
         )}
 
+        {review?.paused && !review.finished && !trial && (
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-brand/10 p-3 ring-2 ring-brand/70">
+            <span className="text-sm font-semibold">Repaso en pausa</span>
+            <button type="button" onClick={() => setReview({ ...review, paused: false })} className="btn-primary">
+              <Play className="size-4" /> Continuar repaso
+            </button>
+          </div>
+        )}
+
         {(analysis ?? liveEvals?.length) ? <EvalGraph evals={evals} fens={fens} classes={classes} ply={ply} onSelect={goto} /> : null}
 
         <div className="rounded-lg bg-panel p-1 lg:p-2">
@@ -335,7 +416,7 @@ export function GameReview({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {toolbar}
+          {analysis && toolbar}
           {analysis && !review && (
             <button type="button" onClick={() => startReview(game.userColor ?? (orientation === "black" ? "b" : "w"))} className="btn-secondary">
               <GraduationCap className="size-4" /> Repasar partida
@@ -346,8 +427,8 @@ export function GameReview({
               Salir del repaso
             </button>
           )}
-          <button type="button" aria-label="Girar tablero" onClick={() => setFlipped(!flipped)} className="btn-secondary px-3">
-            <FlipVertical2 className="size-4" />
+          <button type="button" aria-label="Girar tablero" title="Girar tablero" onClick={() => setFlipped(!flipped)} className="btn-secondary px-3">
+            <RefreshCw className="size-4" />
           </button>
         </div>
 
@@ -436,10 +517,13 @@ function TrialPanel({
 }) {
   const s = trial.status;
   const tone =
-    s === "correct" ? "ring-c-best/70" : s === "wrong" ? "ring-c-blunder/70" : "ring-line";
+    s === "correct" ? "bg-c-best/15 ring-c-best" : s === "wrong" ? "bg-c-blunder/15 ring-c-blunder" : "bg-brand/10 ring-brand";
   return (
-    <div className={`rounded-lg bg-panel p-3 ring-1 ${tone}`} aria-live="polite">
-      <p className="font-semibold">{s === "idle" || s === "checking" ? prompt : trial.msg ?? "Omitida"}</p>
+    <div className={`rounded-xl p-4 ring-2 ${tone}`} aria-live="polite">
+      <p className="flex items-center gap-2 text-lg font-bold">
+        {(s === "idle" || s === "checking") && <Target className="size-5 shrink-0 text-brand" />}
+        {s === "idle" || s === "checking" ? prompt : (trial.msg ?? "Omitida")}
+      </p>
       {s === "checking" && <p className="mt-1 text-sm text-muted">Comprobando…</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {s === "wrong" && (
@@ -474,6 +558,46 @@ function TrialPanel({
             Volver a la partida
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function PendingPanel({
+  san,
+  cls,
+  who,
+  brilliant,
+  onReview,
+  onContinue,
+}: {
+  san: string;
+  cls: GameAnalysis["moves"][number]["class"];
+  who: string;
+  brilliant: boolean;
+  onReview: () => void;
+  onContinue: () => void;
+}) {
+  const meta = CLASS_META[cls];
+  return (
+    <div className="rounded-xl bg-brand/10 p-4 ring-2 ring-brand" aria-live="polite">
+      <div className="flex items-center gap-3">
+        <ClassIcon cls={cls} size={36} />
+        <div className="min-w-0">
+          <p className="text-lg font-bold">
+            {prettySan(san)} <span style={{ color: meta.color }}>{CLASS_PHRASE[cls]}</span>
+          </p>
+          <p className="truncate text-sm text-muted">{who}</p>
+        </div>
+      </div>
+      {brilliant && <p className="mt-1 text-sm text-muted">Aquí había una jugada brillante.</p>}
+      <div className="mt-3 flex gap-2">
+        <button type="button" onClick={onReview} className="btn-primary flex-1">
+          <Target className="size-4" /> Repasar
+        </button>
+        <button type="button" onClick={onContinue} className="btn-secondary flex-1">
+          Continuar
+        </button>
       </div>
     </div>
   );

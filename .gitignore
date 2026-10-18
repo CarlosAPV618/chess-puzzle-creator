@@ -44,3 +44,4 @@ public/swe-worker-*
 .playwright-cli/
 .claude/*.lock
 .claude/settings.local.json
+.claude/skills/

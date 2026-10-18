@@ -7,9 +7,9 @@ import { AppShell } from "~/components/app-shell";
 import { TRPCReactProvider } from "~/trpc/react";
 
 export const metadata: Metadata = {
-  title: { default: "Chess Puzzle Creator", template: "%s · Chess Puzzle Creator" },
+  title: { default: "Chess Puzzle Creator Pro", template: "%s · Chess Puzzle Creator Pro" },
   description: "Analiza tus partidas y practica tus propios errores",
-  applicationName: "Chess Puzzle Creator",
+  applicationName: "Chess Puzzle Creator Pro",
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/icons/icon.svg", type: "image/svg+xml" }],
     apple: "/icons/apple-touch-icon.png",

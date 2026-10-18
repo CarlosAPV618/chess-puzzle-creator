@@ -148,7 +148,7 @@ export function ImportForm() {
           Tus partidas, <span className="text-brand">tus ejercicios</span>
         </h1>
         <p className="mt-2 max-w-lg text-muted">
-          Importa una partida, analízala con Stockfish en tu dispositivo y practica los momentos donde se decidió.
+          Importa una partida, analízala con Stockfish y practica los momentos donde se decidió.
         </p>
       </section>
 

@@ -2,7 +2,7 @@
 
 import { Chess, type Square } from "chess.js";
 import { useMemo, useState, type CSSProperties } from "react";
-import { Chessboard, type Arrow } from "react-chessboard";
+import { Chessboard, type Arrow, type PieceRenderObject } from "react-chessboard";
 import type { Classification } from "~/lib/types";
 import { ClassIcon } from "./class-icon";
 
@@ -18,6 +18,14 @@ export type BoardProps = {
   /** Casillas resaltadas (p. ej. la pista). */
   highlight?: string[];
 };
+
+// Set cburnett de Lichess (Colin M.L. Burnett, GPLv2+), SVG vectorial nítido a cualquier tamaño.
+const PIECES: PieceRenderObject = Object.fromEntries(
+  ["wK", "wQ", "wR", "wB", "wN", "wP", "bK", "bQ", "bR", "bB", "bN", "bP"].map((p) => [
+    p,
+    () => <img src={`/pieces/cburnett/${p}.svg`} alt="" draggable={false} style={{ width: "100%", height: "100%" }} />,
+  ]),
+);
 
 const LAST: CSSProperties = { background: "rgba(246, 224, 94, 0.42)" };
 const SELECTED: CSSProperties = { background: "rgba(127, 178, 74, 0.55)" };
@@ -74,6 +82,7 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
         options={{
           id,
           position: fen,
+          pieces: PIECES,
           boardOrientation: orientation,
           arrows,
           allowDrawingArrows: false,
@@ -104,7 +113,7 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
                 />
               )}
               {badge?.square === square && (
-                <span key={fen} className="animate-pop pointer-events-none absolute -top-[14%] -right-[14%] z-10 w-[46%] drop-shadow">
+                <span key={fen} className="animate-pop pointer-events-none absolute -top-[14%] -right-[14%] z-10 w-[46%]">
                   <ClassIcon cls={badge.cls} size={64} className="h-auto w-full" />
                 </span>
               )}

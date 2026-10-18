@@ -11,7 +11,7 @@ export const CLASS_META: Record<Classification, { label: string; color: string; 
   inaccuracy: { label: "Imprecisión", color: "var(--color-c-inaccuracy)", symbol: "?!" },
   mistake: { label: "Error", color: "var(--color-c-mistake)", symbol: "?" },
   miss: { label: "Oportunidad perdida", color: "var(--color-c-miss)", symbol: "✕" },
-  blunder: { label: "Blunder", color: "var(--color-c-blunder)", symbol: "??" },
+  blunder: { label: "Error grave", color: "var(--color-c-blunder)", symbol: "??" },
 };
 
 /** Clases que ofrecen "Reintentar" (D9b). */
@@ -99,11 +99,14 @@ export function ClassIcon({
       role="img"
       aria-label={meta.label}
       className={className}
+      shapeRendering="geometricPrecision"
+      textRendering="geometricPrecision"
       style={{ ["--icon-bg" as string]: meta.color, flexShrink: 0 }}
     >
       <title>{meta.label}</title>
-      <circle cx="10" cy="10" r="9.6" fill={meta.color} />
-      <circle cx="10" cy="10" r="9.6" fill="none" stroke="#0004" strokeWidth={0.8} />
+      {/* Sombra dentro del SVG: un drop-shadow de CSS lo rasteriza y se ve pixelado. */}
+      <circle cx="10" cy="10.7" r="9.1" fill="#0006" />
+      <circle cx="10" cy="10" r="9.1" fill={meta.color} />
       <Glyph cls={cls} />
     </svg>
   );

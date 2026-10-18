@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: App instalable
-La app SHALL publicar un web manifest ("Chess Puzzle Creator", `display: standalone`, iconos 192, 512 y maskable) y un service worker, de modo que sea instalable en Android, escritorio e iOS desde `chess-puzzle-creator.vercel.app`.
+La app SHALL publicar un web manifest ("Chess Puzzle Creator Pro", `display: standalone`, iconos 192, 512 y maskable) y un service worker, de modo que sea instalable en Android, escritorio e iOS desde `chess-puzzle-creator-pro.vercel.app`.
 
 #### Scenario: Botón instalar en Android
 - **WHEN** el navegador dispara `beforeinstallprompt`

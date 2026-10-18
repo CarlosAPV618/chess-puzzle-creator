@@ -9,7 +9,7 @@ export default function OfflinePage() {
       <WifiOff className="mx-auto size-10 text-muted" />
       <h1 className="mt-3 text-xl font-bold">Sin conexión</h1>
       <p className="mt-2 text-sm text-muted">
-        Esta página necesita internet. Sin red puedes pegar un PGN y analizarlo: el motor corre en tu dispositivo.
+        Esta página necesita internet. Sin red puedes pegar un PGN y analizarlo.
       </p>
       <Link href="/" className="btn-primary mt-5">
         Ir a Importar

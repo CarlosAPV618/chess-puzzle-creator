@@ -1,14 +1,14 @@
-# Chess Puzzle Creator
+# Chess Puzzle Creator Pro
 
 Analiza tus partidas de ajedrez y practica **tus propios errores**. Importa desde PGN, un link de Lichess o Chess.com, o un usuario de esas plataformas. Stockfish corre en tu navegador, clasifica cada jugada al estilo chess.com (incluidas las **brillantes**) y convierte los blunders, las oportunidades perdidas y las brillantes de tus partidas, tuyas y de tus rivales, en ejercicios con repetición espaciada.
 
-**Demo:** https://chess-puzzle-creator.vercel.app
+**Demo:** https://chess-puzzle-creator-pro.vercel.app
 
 ## Funciones
 
 - **Importar:** PGN (una o varias partidas), link de partida de Lichess o Chess.com, o las últimas N partidas de un usuario.
-- **Analizar en tu dispositivo:** Stockfish 19 (WASM) en un Web Worker. Muestra barra de evaluación, gráfica, mejor jugada, precisión e iconos de clasificación.
-- **Clasificación:** Brillante, Gran jugada, Mejor, Excelente, Buena, Teoría, Forzada, Imprecisión, Error, Oportunidad perdida y Blunder.
+- **Analizar:** Stockfish 19 (WASM) en un Web Worker. Muestra barra de evaluación, gráfica, mejor jugada, precisión e iconos de clasificación.
+- **Clasificación:** Brillante, Gran jugada, Mejor, Excelente, Buena, Teoría, Forzada, Imprecisión, Error, Oportunidad perdida y Error grave.
 - **Practicar:** ejercicios de "Corrige el error" y "Encuentra la brillante", con repetición espaciada (cajas de Leitner).
 - **Repasar partida:** reintenta cualquier jugada mala, como en el "Retry" de chess.com.
 - **PWA instalable:** analiza un PGN pegado incluso sin conexión.
@@ -48,5 +48,6 @@ El registro no verifica el correo y está limitado a 20 cuentas (fila `max_users
 
 - [Stockfish](https://github.com/official-stockfish/Stockfish) (GPL-3.0), compilado a WebAssembly por [stockfish.js](https://github.com/nmrugg/stockfish.js) (GPL-3.0). Los binarios están en `public/engine/`.
 - La clasificación de jugadas y la detección de sacrificios (Brillante) son un port de [WintrChess](https://github.com/WintrCat/wintrchess) (GPL-3.0) de WintrCat. Cada archivo portado indica su origen.
+- Piezas [cburnett](https://github.com/lichess-org/lila/tree/master/public/piece/cburnett) de Colin M.L. Burnett (GPLv2+), vía Lichess.
 - El libro de aperturas viene de [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings) (CC0).
 - Las fórmulas de probabilidad de victoria y de precisión son las de [Lichess](https://lichess.org/page/accuracy).

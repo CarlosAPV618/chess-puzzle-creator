@@ -30,6 +30,9 @@ function Form({ mode }: { mode: "login" | "signup" }) {
   const closed = status.data?.open === false;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [chesscom, setChesscom] = useState("");
+  const [lichess, setLichess] = useState("");
+  const addPlayer = api.players.add.useMutation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const qs = params.get("next") ? `?next=${encodeURIComponent(next)}` : "";
@@ -41,11 +44,21 @@ function Form({ mode }: { mode: "login" | "signup" }) {
     const res =
       mode === "login"
         ? await authClient.signIn.email({ email, password })
-        : await authClient.signUp.email({ email, password, name: email.split("@")[0] ?? email });
+        : await authClient.signUp.email({
+            email,
+            password,
+            name: chesscom.trim() || lichess.trim() || (email.split("@")[0] ?? email),
+          });
     if (res.error) {
       setError(authMessage(res.error));
       setBusy(false);
       return;
+    }
+    // Usuarios de Chess.com y Lichess (opcionales): sirven para detectar tu color al importar.
+    // Si falla no bloquea el registro; se pueden volver a indicar al importar.
+    if (mode === "signup") {
+      const names = [chesscom, lichess].map((n) => n.trim()).filter(Boolean);
+      await Promise.allSettled(names.map((name) => addPlayer.mutateAsync({ name })));
     }
     // Navegación completa: `router.refresh()` tras `push` cancela la navegación en Next 15,
     // y así toda la app relee la sesión nueva.
@@ -87,6 +100,40 @@ function Form({ mode }: { mode: "login" | "signup" }) {
                 className="field"
               />
             </label>
+            {mode === "signup" && (
+              <fieldset className="grid gap-3 rounded-lg border border-line/70 p-3">
+                <legend className="px-1 text-xs text-muted">Tus cuentas (opcional)</legend>
+                <p className="-mt-1 text-xs text-muted">Así reconocemos tus partidas al importarlas.</p>
+                <label className="grid gap-1 text-sm font-medium">
+                  Usuario de Chess.com
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    pattern="[A-Za-z0-9_\-]{2,30}"
+                    title="Letras, números, guion o guion bajo"
+                    value={chesscom}
+                    onChange={(e) => setChesscom(e.target.value)}
+                    className="field"
+                  />
+                </label>
+                <label className="grid gap-1 text-sm font-medium">
+                  Usuario de Lichess
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    pattern="[A-Za-z0-9_\-]{2,30}"
+                    title="Letras, números, guion o guion bajo"
+                    value={lichess}
+                    onChange={(e) => setLichess(e.target.value)}
+                    className="field"
+                  />
+                </label>
+              </fieldset>
+            )}
             {error && (
               <p className="text-sm text-[#ffb4a8]" role="alert">
                 {error}

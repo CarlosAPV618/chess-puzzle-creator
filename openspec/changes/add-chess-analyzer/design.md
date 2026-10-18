@@ -286,10 +286,10 @@ Sin `user_color`, los ejercicios se generan igual con `side = null` y se etiquet
 El resto de las jugadas se practica dentro de la propia partida, sin banco de ejercicios ni repetición espaciada:
 - **Reintentar una jugada:** en la revisión, cualquier jugada con clase Imprecisión, Error, Blunder u Oportunidad perdida muestra el botón "Reintentar". El tablero vuelve a la posición previa y el usuario busca una jugada mejor.
 - **Modo repaso:** el botón "Repasar partida" reproduce la partida desde el inicio, jugada por jugada, con el tablero orientado al bando elegido (por defecto, el del usuario).
-  - En cada momento clave de ese bando (Imprecisión, Error, Blunder u Oportunidad perdida, más las Brillantes no vistas) se pausa y pide "Encuentra una jugada mejor".
-  - El usuario puede intentar, pedir pista, ver la mejor jugada u "Omitir".
-  - Las jugadas buenas se reproducen solas. Las teclas ◀ ▶ siguen funcionando.
-  - Al final se muestra un resumen: momentos clave acertados de N.
+  - En cada momento clave de ese bando (Imprecisión, Error, Error grave u Oportunidad perdida, más las Brillantes no vistas) se detiene **mostrando primero la jugada mala con su icono** y ofrece "Repasar" (vuelve a la posición previa y pide "Encuentra una jugada mejor que X") o "Continuar".
+  - En el intento: pista, ver la mejor jugada u "Omitir". La jugada intentada muestra su icono en el tablero.
+  - Las jugadas buenas se reproducen solas. **Navegar a mano** (flechas, lista de jugadas, gráfica, teclado o rueda) **pausa el repaso**, y "Continuar repaso" lo retoma desde la posición donde quedó el usuario.
+  - Al final se muestra un resumen: momentos clave acertados de N. Si el bando no tiene momentos clave, lo dice y ofrece repasar los del rival.
 - **Validación:** la misma que en los ejercicios de tipo `mistake` (D9). Primero la mejor jugada guardada y la segunda línea si pierde < 0.05; si no, comparación con `searchmoves` a profundidad 14. En un momento de Brillante no vista, la jugada Brillante se celebra como "¡Brillante!" y otra jugada aceptable cuenta como acierto.
 - **Persistencia:** no se guarda nada; es práctica libre. Funciona también sin cuenta, sobre un análisis en memoria.
 
@@ -312,14 +312,18 @@ El resto de las jugadas se practica dentro de la propia partida, sin banco de ej
 | Forzada | gris | → |
 | Imprecisión | amarillo | ?! |
 | Error | naranja | ? |
-| Oportunidad perdida | rosa | ✕ |
-| Blunder | rojo | ?? |
+| Oportunidad perdida | rojo claro (#ff7769, como chess.com) | ✕ |
+| Error grave (blunder) | rojo | ?? |
 
   El icono se dibuja sobre la casilla de destino con el `squareRenderer` de react-chessboard y se repite en la lista de jugadas. La mejor jugada se muestra con una flecha.
+- **Navegación:** botones ⏮ ◀ ▶ ⏭; teclado ← → una jugada, ↑ inicio, ↓ final; rueda del mouse sobre el tablero (abajo avanza), como chess.com y Lichess.
+- **Iconos nítidos:** la sombra va dentro del SVG; un `drop-shadow` de CSS con la animación de escala los rasterizaba (se veían pixelados).
+- **Piezas:** set cburnett de Lichess (Colin M.L. Burnett, GPLv2+) en `public/pieces/cburnett/`, en lugar de las piezas por defecto de react-chessboard.
 - **Tablero:** react-chessboard v5 (MIT, requiere React 19). chessground tiene mejor soporte táctil pero es GPL y su wrapper de React no es oficial. Se queda react-chessboard, que es el mismo que usa WintrChess y facilita portar. Se habilita "tocar origen, tocar destino" además de arrastrar, porque en el celular arrastrar es incómodo [POR VERIFICAR la experiencia táctil de arrastre en iOS].
 - **Accesibilidad:** cada icono tiene `aria-label` con el nombre de la clase. El contraste se mantiene AA y los botones táctiles miden ≥ 44 px.
 
 ### D11. Cuentas: correo y contraseña sin verificación, máximo 20 cuentas
+- **Registro:** pide opcionalmente el usuario de Chess.com y el de Lichess; se guardan en `player_names` para detectar el color del usuario al importar.
 - Better Auth en `app/api/auth/[...all]/route.ts` con `emailAndPassword: { enabled: true, requireEmailVerification: false }` y el plugin `nextCookies()` al final de la lista de plugins.
 - No se verifica el correo y se aceptan correos falsos, así que no hace falta servicio de correo. La contraseña mide mínimo 8 caracteres (el default de Better Auth).
 - **Sin recuperación de contraseña:** sin correo real no hay cómo enviarla. Si alguien la olvida, el operador la restablece con un script CLI (`reset-password <email>`).
@@ -376,7 +380,7 @@ public/engine/    stockfish lite (js + wasm)
 Tests con `node --test` + `tsx`, como en QR-generator. Los de `lib/classify` y `lib/import` son puros. Los de servidor (tope de cuentas, rate limit, aislamiento por usuario, generación de ejercicios, validación del análisis) corren contra el Postgres local (D2).
 
 ### D13. PWA instalable
-- **Nombre:** "Chess Puzzle Creator". **Dominio:** `chess-puzzle-creator.vercel.app`.
+- **Nombre:** "Chess Puzzle Creator Pro". **Dominio:** `chess-puzzle-creator-pro.vercel.app`.
 - **Manifest** con `app/manifest.ts`, que Next soporta de forma nativa:
   - `display: standalone`, colores del tema e iconos 192, 512 y maskable;
   - `apple-touch-icon` y meta tags para iOS.
@@ -395,7 +399,7 @@ Tests con `node --test` + `tsx`, como en QR-generator. Los de `lib/classify` y `
 - `DATABASE_URL_POOLED`: Neon, pooler; la usa la app.
 - `DATABASE_URL_TEST`: Postgres local de docker compose (`chess_test`); solo para pruebas y nunca en Vercel.
 - `BETTER_AUTH_SECRET`.
-- `BETTER_AUTH_URL`: `https://chess-puzzle-creator.vercel.app` en producción.
+- `BETTER_AUTH_URL`: `https://chess-puzzle-creator-pro.vercel.app` en producción.
 
 El `src/env.js` de T3 se ajusta, porque por defecto solo pide `DATABASE_URL`.
 
@@ -429,7 +433,7 @@ Proyecto nuevo. Las migraciones se aplican a mano con `pnpm db:migrate` (contra 
 ## Open Questions
 1. ~~Licencia del repo~~ **Decidido:** opción A, repo público bajo GPL-3.0 y portar el clasificador de WintrChess (D5).
 2. ~~Métodos de login~~ **Decidido:** correo y contraseña sin verificación, con tope de 20 cuentas (D11).
-3. ~~Nombre y dominio~~ **Decidido:** Chess Puzzle Creator, en `chess-puzzle-creator.vercel.app` (D13).
+3. ~~Nombre y dominio~~ **Decidido:** Chess Puzzle Creator Pro, en `chess-puzzle-creator-pro.vercel.app` (D13).
 4. ~~Imprecisiones como ejercicios~~ **Decidido:** solo Blunders, Brillantes y Oportunidades perdidas generan ejercicios. El resto se practica en el repaso de la partida (D9b).
 
 ## Fuentes verificadas (2026-10-18)

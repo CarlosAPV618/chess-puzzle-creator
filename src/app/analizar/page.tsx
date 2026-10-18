@@ -40,9 +40,8 @@ export default function AnalyzePage() {
       setAnalysis(pending.analysis);
       return;
     }
-    const g = getCurrentGame();
-    setGame(g);
-    if (g) void analyze(g, 16);
+    // El usuario elige la profundidad y pulsa "Analizar" (Normal por defecto).
+    setGame(getCurrentGame());
   }, []);
 
   async function persist(g: ParsedGame, a: GameAnalysis) {
