@@ -7,18 +7,18 @@
 
 ## 1. Setup
 
-- [ ] 1.1 `pnpm create t3-app@latest` con App Router, tRPC, Drizzle (Postgres), Tailwind y Better Auth. Agregar `pnpm-workspace.yaml` con `allowBuilds` y `minimumReleaseAge`. **Verificar** que trae Next 15 (si trae 16, la redirección va en `proxy.ts` en vez de `middleware.ts`)
+- [x] 1.1 `pnpm create t3-app@latest` con App Router, tRPC, Drizzle (Postgres), Tailwind y Better Auth. Agregar `pnpm-workspace.yaml` con `allowBuilds` y `minimumReleaseAge`. **Verificar** que trae Next 15 (si trae 16, la redirección va en `proxy.ts` en vez de `middleware.ts`)
 - [x] 1.2 (sin shadcn: componentes propios con Tailwind 4, tokens en `globals.css`) y el sistema visual con la skill `frontend-design`: paleta oscura, tipografía, componentes base. Es la base de D10
 - [x] 1.3 Proyecto en Neon con `DATABASE_URL` (directa) y `DATABASE_URL_POOLED` en `.env` (hecho por el usuario)
-- [ ] 1.4 `docker-compose.yml` con Postgres 16 y la base `chess_test` (solo para tests), con `DATABASE_URL_TEST` en `.env`. Ajustar `src/env.js` a las variables de design. Agregar `LICENSE` (GPL-3.0) y un README con la sección "Créditos" (WintrChess, Stockfish, lichess chess-openings)
+- [x] 1.4 `docker-compose.yml` con Postgres 16 y la base `chess_test` (solo para tests), con `DATABASE_URL_TEST` en `.env`. Ajustar `src/env.js` a las variables de design. Agregar `LICENSE` (GPL-3.0) y un README con la sección "Créditos" (WintrChess, Stockfish, lichess chess-openings)
 - [x] 1.5 Cliente de la app con `postgres(DATABASE_URL_POOLED, { prepare: false })`. `drizzle.config` y `pnpm db:migrate` con `DATABASE_URL`. Sin `db:push`
 - [x] 1.6 `node --test` + `tsx`. Helper de pruebas que se niega a correr si `DATABASE_URL_TEST` falta o no apunta a localhost; al inicio recrea los schemas `public` y `drizzle` de la base local y migra
 - [ ] 1.7 Proyecto en Vercel conectado al repo, con `pnpm install --frozen-lockfile` y sin migraciones en el build
 
 ## 2. Cuentas
 
-- [ ] 2.1 Better Auth con correo y contraseña (`requireEmailVerification: false`), `nextCookies()` al final, `trustedOrigins` y esquema migrado. Pantallas `/login` y `/registro` _(server listo (config, esquema, trustedOrigins); faltan pantallas)_
-- [ ] 2.2 Tope de cuentas: _(server listo (app_config, signupStatus, hook, trigger y su error mapeado a SIGNUP_CLOSED, con tests); falta el aviso en el front)_
+- [x] 2.1 Better Auth con correo y contraseña (`requireEmailVerification: false`), `nextCookies()` al final, `trustedOrigins` y esquema migrado. Pantallas `/login` y `/registro` _(server listo (config, esquema, trustedOrigins); faltan pantallas)_
+- [x] 2.2 Tope de cuentas: _(server listo (app_config, signupStatus, hook, trigger y su error mapeado a SIGNUP_CLOSED, con tests); falta el aviso en el front)_
   - tabla `app_config` con `max_users = 20` por migración;
   - `auth.signupStatus` pública y aviso en el front;
   - hook `user.create.before` → 403 `SIGNUP_CLOSED`;
@@ -61,8 +61,8 @@
 - [x] 5.3 Lichess: link (id de 8 caracteres) y usuario (NDJSON) desde el navegador, con manejo de 429 y 404 y filtro de variantes
 - [x] 5.4 Chess.com por usuario: archivos mensuales en serie hasta N partidas o 24 meses, con filtro `rules = chess`
 - [x] 5.5 Ruta `/api/import/chesscom/[type]/[id]` con validación estricta (400 sin petición externa) que usa el callback y busca en el archivo mensual. **Verificar** el formato del callback y que Chess.com no bloquee las IPs de Vercel; si las bloquea, eliminar la ruta y pedir el usuario en el front
-- [ ] 5.6 Tabla `player_names`, detección de `user_color` sin distinguir mayúsculas, pregunta "¿Cuál eres tú?" y `games.setUserColor` (que actualiza `side` en los ejercicios) _(server listo (player_names, players.list/add, detectUserColor, setUserColor); falta la pregunta en la UI)_
-- [ ] 5.7 `games.import` con deduplicación por `(user_id, source, source_id)`, la pantalla "Mis partidas" y `games.delete` con borrado en cascada _(server listo (games.import/list/delete); falta la pantalla)_
+- [x] 5.6 Tabla `player_names`, detección de `user_color` sin distinguir mayúsculas, pregunta "¿Cuál eres tú?" y `games.setUserColor` (que actualiza `side` en los ejercicios) _(server listo (player_names, players.list/add, detectUserColor, setUserColor); falta la pregunta en la UI)_
+- [x] 5.7 `games.import` con deduplicación por `(user_id, source, source_id)`, la pantalla "Mis partidas" y `games.delete` con borrado en cascada _(server listo (games.import/list/delete); falta la pantalla)_
 
 ## 6. Practicar
 
@@ -82,6 +82,6 @@
 
 ## 8. Diseño y lanzamiento
 
-- [ ] 8.1 (360 px y escritorio revisados con Playwright en `/` y `/analizar`; faltan las pantallas con sesión) Revisar todas las pantallas a 360 px, 768 px y escritorio. Botones ≥ 44 px, contraste AA
+- [x] 8.1 (360 px y escritorio revisados con Playwright en `/` y `/analizar`; faltan las pantallas con sesión) Revisar todas las pantallas a 360 px, 768 px y escritorio. Botones ≥ 44 px, contraste AA _(con sesión probado en Neon: login, Mis partidas, análisis guardado, Practicar a 360 px)_
 - [ ] 8.2 Probar tocar-tocar y arrastre en iOS Safari y Android Chrome
 - [ ] 8.3 `pnpm db:migrate` contra producción y deploy a Vercel con `DATABASE_URL_POOLED`, `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL=https://chess-puzzle-creator.vercel.app`
