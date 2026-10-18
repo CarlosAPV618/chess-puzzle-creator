@@ -1,0 +1,8 @@
+schema: spec-driven
+
+context: |
+  Analizador de partidas de ajedrez con ejercicios personalizados a partir de los errores del usuario.
+  Gestor de paquetes: pnpm (nunca npm/npx). Stack: create-t3-app (Next 15) (Next.js App Router + tRPC + Drizzle + Tailwind 4 + Better Auth), shadcn/ui,
+  react-chessboard + chess.js, Stockfish 19 (WASM lite) en un Web Worker del cliente.
+  Hosting: Vercel Hobby + Postgres en Neon (free). Sin storage de archivos: todo vive en Postgres.
+  Idioma código: inglés | Idioma UI y docs: español (México). Mobile-first.

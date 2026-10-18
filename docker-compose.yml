@@ -1,0 +1,13 @@
+# Postgres solo para tests. `pnpm db:test:up` → localhost:5435 (base chess_test).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chess-pg-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chess_test
+    ports:
+      - "127.0.0.1:5435:5432"
+    tmpfs:
+      - /var/lib/postgresql/data

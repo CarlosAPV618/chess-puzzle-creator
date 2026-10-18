@@ -1,0 +1,9 @@
+# pnpm >= 10 no ejecuta scripts de instalación salvo los permitidos aquí.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  "@tailwindcss/oxide": true
+  unrs-resolver: true
+
+# No instalar versiones publicadas hace menos de 1 día (minutos).
+minimumReleaseAge: 1440
