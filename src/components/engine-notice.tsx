@@ -10,7 +10,7 @@ export function EngineNotice() {
       <a className="underline hover:text-fg" href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noreferrer">
         stockfish.js
       </a>
-      . Corre en tu dispositivo.
+      .
     </p>
   );
 }

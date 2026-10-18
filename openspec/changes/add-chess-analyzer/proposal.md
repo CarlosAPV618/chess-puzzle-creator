@@ -15,7 +15,7 @@ Las páginas de ajedrez te dan ejercicios para encontrar la mejor jugada en posi
 
      Los dos tipos se repiten con espaciado (sistema de cajas de Leitner) hasta dominarlos.
   5. **Repasar la partida** (como el "Retry" de chess.com): reproduce la partida y en cada Imprecisión, Error u otra jugada mala se puede reintentar para encontrar una jugada mejor. Es práctica libre: no se guarda ni se repite con espaciado.
-- **PWA instalable** "Chess Puzzle Creator" en `chess-puzzle-creator.vercel.app`, con botón "Instalar app" (en iOS, instrucciones) y análisis sin conexión de un PGN pegado.
+- **PWA instalable** "Chess Puzzle Creator Pro" en `chess-puzzle-creator-pro.vercel.app`, con botón "Instalar app" (en iOS, instrucciones) y análisis sin conexión de un PGN pegado.
 - Cuentas con **Better Auth**:
   - Correo y contraseña, sin verificación de correo.
   - **Máximo 20 cuentas**: al llegar al tope, el registro se bloquea en el front, en el back y con un trigger en la base de datos.

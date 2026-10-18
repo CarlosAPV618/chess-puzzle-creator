@@ -9,8 +9,11 @@ import { bookKey, isBook, lookupOpening } from "./openings";
 export { expectedPoints, pointLoss } from "./expected-points";
 export { isBook, lookupOpening } from "./openings";
 
+/** Pérdida de EP a partir de la cual una jugada del libro deja de contar como Teoría (umbral de Error). */
+const BOOK_MAX_LOSS = 0.1;
+
 /** Bump when classification rules change (lets the server/UI offer a re-analysis). */
-export const CLASSIFIER_VERSION = 1;
+export { CLASSIFIER_VERSION } from "./version";
 
 export type BrilliantCandidate = {
   /** Index of the move (0-based); the position before it is `positions[ply]`. */
@@ -69,9 +72,11 @@ export function classifyGame(input: ClassifyInput): {
     });
 
     let cls: Classification;
+    // El mate va antes que el libro, y una jugada "de libro" que pierde >= 0.10 EP (p. ej. 2.g4?? del
+    // mate del loco, que Lichess nombra como apertura) se clasifica por su pérdida.
     if (legalCount === 1) cls = "forced";
-    else if (inBook) cls = "book";
     else if (chess.isCheckmate()) cls = "best";
+    else if (inBook && epLoss < BOOK_MAX_LOSS) cls = "book";
     else if (topPlayed) {
       const c = ctx();
       cls = isGreat(c) ? "great" : "best";

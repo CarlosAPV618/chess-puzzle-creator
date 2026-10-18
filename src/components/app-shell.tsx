@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "~/server/better-auth/client";
+import { Logo } from "./logo";
 import { PwaBanners, useInstall } from "./pwa";
 
 const NAV = [
@@ -19,11 +20,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <header className="sticky top-0 z-30 border-b border-line/60 bg-ink/90 backdrop-blur pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-3 sm:px-4">
-          <Link href="/" className="flex min-h-11 items-center gap-2 font-bold tracking-tight" aria-label="Chess Puzzle Creator, inicio">
-            <img src="/icons/icon.svg" alt="" width={30} height={30} className="rounded-md" />
-            <span className="text-[15px] leading-none sm:text-base">
-              Chess <span className="text-brand">Puzzle</span> Creator
-            </span>
+          <Link href="/" className="flex min-h-11 items-center" aria-label="Chess Puzzle Creator Pro, inicio">
+            <Logo />
           </Link>
           <nav aria-label="Principal" className="ml-4 hidden gap-1 md:flex">
             {NAV.map((n) => (

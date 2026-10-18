@@ -41,7 +41,7 @@ export function AnalysisControls({
         >
           <div className="h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
-        <p className="mt-2 text-xs text-muted">No cierres ni cambies de pestaña: el análisis corre en tu dispositivo.</p>
+        <p className="mt-2 text-xs text-muted">No cierres ni cambies de pestaña hasta que termine el análisis.</p>
       </div>
     );
   }

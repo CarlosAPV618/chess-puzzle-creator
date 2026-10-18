@@ -125,6 +125,22 @@ test("Forced, Great, and capturing hanging material is not Great", () => {
   assert.equal(capture.moves[0]!.class, "best");
 });
 
+test("Book: a named but losing line is classified by its loss; mate beats book (Fool's mate)", () => {
+  const moves = ["f2f3", "e7e5", "g2g4", "d8h4"];
+  const positions = [
+    pos({ cp: 20 }, "e2e4"),
+    pos({ cp: -60 }, "e7e5"),
+    pos({ cp: -70 }, "e2e4"),
+    pos({ mate: -1 }, "d8h4"),
+    pos({ mate: 0 }),
+  ];
+  const r = classifyGame({ startFen: START, movesUci: moves, positions, userColor: "w" });
+  const cls = r.moves.map((m) => m.class);
+  assert.notEqual(cls[2], "book", "2.g4?? allows mate: not Teoría");
+  assert.equal(cls[2], "blunder");
+  assert.equal(cls[3], "best", "the mating move is Mejor, not Teoría");
+});
+
 test("Book: Ruy Lopez, ep field ignored", () => {
   const moves = ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5"];
   const positions = Array.from({ length: 6 }, () => pos({ cp: 20 }));

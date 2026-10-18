@@ -2,7 +2,7 @@
 
 - [x] 0.1 OQ 1: repo público bajo GPL-3.0 y portar el clasificador de WintrChess (decidido)
 - [x] 0.2 OQ 2: correo y contraseña sin verificación, con tope de 20 cuentas (decidido)
-- [x] 0.3 OQ 3: Chess Puzzle Creator, en `chess-puzzle-creator.vercel.app` (decidido)
+- [x] 0.3 OQ 3: Chess Puzzle Creator Pro, en `chess-puzzle-creator-pro.vercel.app` (decidido)
 - [x] 0.4 OQ 4: solo Blunders, Brillantes y Oportunidades perdidas generan ejercicios (decidido)
 
 ## 1. Setup
@@ -84,4 +84,4 @@
 
 - [x] 8.1 (360 px y escritorio revisados con Playwright en `/` y `/analizar`; faltan las pantallas con sesión) Revisar todas las pantallas a 360 px, 768 px y escritorio. Botones ≥ 44 px, contraste AA _(con sesión probado en Neon: login, Mis partidas, análisis guardado, Practicar a 360 px)_
 - [ ] 8.2 Probar tocar-tocar y arrastre en iOS Safari y Android Chrome
-- [ ] 8.3 `pnpm db:migrate` contra producción y deploy a Vercel con `DATABASE_URL_POOLED`, `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL=https://chess-puzzle-creator.vercel.app`
+- [ ] 8.3 `pnpm db:migrate` contra producción y deploy a Vercel con `DATABASE_URL_POOLED`, `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL=https://chess-puzzle-creator-pro.vercel.app`

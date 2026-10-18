@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { expectedPoints } from "~/lib/classify/expected-points";
 import type { Color, Eval } from "~/lib/types";
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -50,8 +51,7 @@ export function whiteShare(e: Eval | undefined, fen?: string) {
     if (e.mate === 0) return fen && turnOf(fen) === "w" ? 0 : 1;
     return e.mate > 0 ? 1 : 0;
   }
-  const cp = Math.max(-1000, Math.min(1000, e.cp));
-  return 1 / (1 + Math.exp(-0.00368208 * cp));
+  return expectedPoints(e, "w");
 }
 
 export function formatEval(e: Eval | undefined, fen?: string) {

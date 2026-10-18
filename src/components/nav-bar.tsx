@@ -3,14 +3,14 @@
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect } from "react";
 
-/** ⏮ ◀ ▶ ⏭ + flechas del teclado. */
+/** ⏮ ◀ ▶ ⏭ + teclado: ← → una jugada, ↑ inicio, ↓ final. */
 export function NavBar({ ply, max, onChange }: { ply: number; max: number; onChange: (ply: number) => void }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
       if (t?.closest("input, textarea, select, [contenteditable=true]")) return;
       const next =
-        e.key === "ArrowLeft" ? ply - 1 : e.key === "ArrowRight" ? ply + 1 : e.key === "Home" ? 0 : e.key === "End" ? max : null;
+        e.key === "ArrowLeft" ? ply - 1 : e.key === "ArrowRight" ? ply + 1 : e.key === "Home" || e.key === "ArrowUp" ? 0 : e.key === "End" || e.key === "ArrowDown" ? max : null;
       if (next === null) return;
       e.preventDefault();
       onChange(Math.max(0, Math.min(max, next)));
