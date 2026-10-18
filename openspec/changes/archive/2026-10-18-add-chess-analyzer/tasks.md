@@ -13,7 +13,7 @@
 - [x] 1.4 `docker-compose.yml` con Postgres 16 y la base `chess_test` (solo para tests), con `DATABASE_URL_TEST` en `.env`. Ajustar `src/env.js` a las variables de design. Agregar `LICENSE` (GPL-3.0) y un README con la sección "Créditos" (WintrChess, Stockfish, lichess chess-openings)
 - [x] 1.5 Cliente de la app con `postgres(DATABASE_URL_POOLED, { prepare: false })`. `drizzle.config` y `pnpm db:migrate` con `DATABASE_URL`. Sin `db:push`
 - [x] 1.6 `node --test` + `tsx`. Helper de pruebas que se niega a correr si `DATABASE_URL_TEST` falta o no apunta a localhost; al inicio recrea los schemas `public` y `drizzle` de la base local y migra
-- [ ] 1.7 Proyecto en Vercel conectado al repo, con `pnpm install --frozen-lockfile` y sin migraciones en el build
+- [x] 1.7 Proyecto en Vercel conectado al repo, con `pnpm install --frozen-lockfile` y sin migraciones en el build
 
 ## 2. Cuentas
 
@@ -84,4 +84,4 @@
 
 - [x] 8.1 (360 px y escritorio revisados con Playwright en `/` y `/analizar`; faltan las pantallas con sesión) Revisar todas las pantallas a 360 px, 768 px y escritorio. Botones ≥ 44 px, contraste AA _(con sesión probado en Neon: login, Mis partidas, análisis guardado, Practicar a 360 px)_
 - [ ] 8.2 Probar tocar-tocar y arrastre en iOS Safari y Android Chrome
-- [ ] 8.3 `pnpm db:migrate` contra producción y deploy a Vercel con `DATABASE_URL_POOLED`, `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL=https://chess-puzzle-creator-pro.vercel.app`
+- [x] 8.3 `pnpm db:migrate` contra producción y deploy a Vercel con `DATABASE_URL_POOLED`, `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL=https://chess-puzzle-creator-pro.vercel.app`
