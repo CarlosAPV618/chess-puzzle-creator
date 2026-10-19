@@ -71,6 +71,6 @@ export type ParsedGame = {
   userColor: Color | null;
 };
 
-export type ExerciseKind = "mistake" | "brilliant";
+export type ExerciseKind = "mistake" | "brilliant" | "miss";
 export type ExerciseSide = "me" | "opponent" | null;
 export type Phase = "opening" | "middlegame" | "endgame";

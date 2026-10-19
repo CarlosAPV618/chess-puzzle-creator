@@ -30,9 +30,12 @@ const PIECES: PieceRenderObject = Object.fromEntries(
 const LAST: CSSProperties = { background: "rgba(246, 224, 94, 0.42)" };
 const SELECTED: CSSProperties = { background: "rgba(127, 178, 74, 0.55)" };
 const HINT: CSSProperties = { boxShadow: "inset 0 0 0 4px #1fb5ad", background: "rgba(31,181,173,.25)" };
+/** Casilla marcada con clic derecho (D7), como lichess. */
+const MARK: CSSProperties = { background: "rgba(235, 97, 80, 0.8)" };
 
 export function Board({ id = "board", fen, orientation, onMove, arrows = [], lastMove, badge, highlight = [] }: BoardProps) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [marks, setMarks] = useState<ReadonlySet<string>>(new Set());
   const chess = useMemo(() => {
     try {
       return new Chess(fen);
@@ -41,11 +44,12 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
     }
   }, [fen]);
 
-  // La selección se descarta si cambia la posición.
+  // La selección y las marcas se descartan si cambia la posición.
   const [lastFen, setLastFen] = useState(fen);
   if (lastFen !== fen) {
     setLastFen(fen);
     setSelected(null);
+    setMarks(new Set());
   }
 
   const targets = useMemo(
@@ -75,6 +79,7 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
   }
   for (const s of highlight) squareStyles[s] = HINT;
   if (selected) squareStyles[selected] = SELECTED;
+  for (const s of marks) squareStyles[s] = { ...squareStyles[s], ...MARK };
 
   return (
     <div className="relative aspect-square w-full touch-manipulation select-none shadow-[0_10px_40px_-12px_#000]">
@@ -85,7 +90,8 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
           pieces: PIECES,
           boardOrientation: orientation,
           arrows,
-          allowDrawingArrows: false,
+          // Flechas con clic derecho arrastrando; la librería las guarda aparte de `arrows` (D7).
+          allowDrawingArrows: true,
           animationDurationInMs: 180,
           lightSquareStyle: { backgroundColor: "var(--color-board-light)" },
           darkSquareStyle: { backgroundColor: "var(--color-board-dark)" },
@@ -98,6 +104,16 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
             if (!onMove) return;
             if (selected && targets.includes(square)) return void tryMove(selected, square);
             setSelected(ownPiece(square) && square !== selected ? square : null);
+          },
+          onSquareRightClick: ({ square }) =>
+            setMarks((m) => {
+              const n = new Set(m);
+              if (!n.delete(square)) n.add(square);
+              return n;
+            }),
+          // Clic izquierdo borra las marcas, igual que la librería borra las flechas en mousedown.
+          onSquareMouseDown: (_, e) => {
+            if (e.button === 0 && marks.size) setMarks(new Set());
           },
           squareRenderer: ({ square, children }) => (
             <div style={{ width: "100%", height: "100%", position: "relative", ...squareStyles[square] }}>

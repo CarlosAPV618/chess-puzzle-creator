@@ -37,6 +37,10 @@ SHALL funcionar desde 360 px de ancho sin scroll horizontal.
 - **WHEN** en un celular de 360 px el usuario toca "Repasar partida" en la barra fija
 - **THEN** el repaso empieza con el tablero completo a la vista
 
+#### Scenario: Repaso sin pistas
+- **WHEN** durante "Repasar partida" el repaso se detiene en una jugada mala y muestra "Repasar" / "Continuar"
+- **THEN** el tablero no dibuja la flecha de la mejor jugada; solo aparece al pedir "Ver solución"
+
 #### Scenario: Navegar con teclado
 - **WHEN** el usuario presiona ← o → en escritorio
 - **THEN** retrocede o avanza una jugada

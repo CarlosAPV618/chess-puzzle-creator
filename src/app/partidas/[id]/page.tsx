@@ -68,17 +68,17 @@ export default function SavedGamePage() {
           {game.openingName && <span className="ml-2 text-sm font-normal text-muted">{game.openingName}</span>}
         </h1>
       </div>
-      {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
-        <p className="mb-3 rounded-lg bg-raised p-3 text-sm" role="status">
-          La clasificación mejoró desde que analizaste esta partida. Usa <strong>Reanalizar</strong> para actualizarla.
-        </p>
-      )}
       <GameReview
         game={game}
         analysis={analysis}
         liveEvals={state.status === "running" ? liveEvals : undefined}
         toolbar={
           <>
+            {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
+              <p className="w-full rounded-lg bg-raised p-3 text-sm" role="status">
+                La clasificación mejoró desde que analizaste esta partida. Usa <strong>Reanalizar</strong> para actualizarla.
+              </p>
+            )}
             <AnalysisControls state={state} hasAnalysis={!!analysis} onStart={(d) => void analyze(d)} onCancel={cancel} />
             {save.isPending && (
               <p className="flex w-full items-center gap-2 text-sm text-muted">
@@ -93,7 +93,7 @@ export default function SavedGamePage() {
                     Reintentar guardado
                   </button>
                 ) : (
-                  <Link href={`/practicar?game=${id}`} className="btn-ghost text-brand">
+                  <Link href={`/practicar?partida=${id}`} className="btn-ghost text-brand">
                     <Puzzle className="size-4" /> Practicar esta partida
                   </Link>
                 )}

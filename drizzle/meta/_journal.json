@@ -15,6 +15,13 @@
       "when": 1792353969229,
       "tag": "0001_signup_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792367898901,
+      "tag": "0002_exercise_kinds",
+      "breakpoints": true
     }
   ]
 }

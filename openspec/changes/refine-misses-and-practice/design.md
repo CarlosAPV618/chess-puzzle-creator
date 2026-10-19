@@ -142,6 +142,7 @@ Hoy `Board` pone `allowDrawingArrows: false`.
   - la barra fija suma dos botones de icono: Repasar (`GraduationCap`), que durante el repaso pasa a "Salir del repaso" (`X`), y Girar (`RefreshCw`);
   - en el panel se ocultan esos dos para no duplicarlos;
   - al iniciar el repaso, `boardRef.current.scrollIntoView({ block: "start" })`, con `scroll-margin-top` igual a la cabecera fija.
+- **Repaso sin pistas.** `arrows` dibuja la mejor jugada tras cada jugada mala (rama `prevBest`), incluso con el repaso en pausa sobre esa jugada, y revela la respuesta. Con un repaso activo (`review && !review.finished`), esa rama no se aplica; la flecha solo sale con "Ver solución" (`trial.status === "solution"`).
 - **Gráfica.** Cambia `touch-none` por `touch-pan-y`. Con `pointerType === "touch"` solo se selecciona en `pointerup`, si el dedo se movió menos de 8 px y no hubo `pointercancel`. Con mouse se sigue arrastrando.
 - **Aviso de Stockfish.** Sale de `review.tsx` (D4).
 

@@ -3,6 +3,7 @@
 import { ChevronRight, Cpu, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { ClassIcon } from "~/components/class-icon";
+import { MiniBoard } from "~/components/mini-board";
 import { netError } from "~/components/pwa";
 import type { Color } from "~/lib/types";
 import { api } from "~/trpc/react";
@@ -39,72 +40,87 @@ export default function GamesPage() {
         </p>
       )}
 
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {list.data?.map((g) => (
-          <li key={g.id} className="card p-3">
-            <div className="flex items-center gap-3">
-              <Link href={`/partidas/${g.id}`} className="min-w-0 flex-1">
-                <p className="truncate font-semibold">
-                  <span className={g.userColor === "w" ? "text-brand" : undefined}>{g.white}</span>
-                  <span className="mx-1.5 text-muted">vs</span>
-                  <span className={g.userColor === "b" ? "text-brand" : undefined}>{g.black}</span>
-                  <span className="ml-2 font-mono text-xs text-muted">{g.result}</span>
-                </p>
-                <p className="truncate text-xs text-muted">
-                  {[g.openingName, g.timeClass, g.playedAt ? new Date(g.playedAt).toLocaleDateString("es-MX") : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </Link>
-              {g.analyzed ? (
-                <Link href={`/partidas/${g.id}`} className="flex min-h-11 items-center gap-2 text-sm" aria-label="Ver análisis">
-                  {g.accuracyUser !== null && (
-                    <span className="rounded bg-raised px-1.5 py-0.5 font-mono font-bold" title="Tu precisión">
-                      {g.accuracyUser.toFixed(1)}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-0.5" title="Errores">
-                    <ClassIcon cls="blunder" size={16} /> {g.mistakes ?? 0}
-                  </span>
-                  <span className="flex items-center gap-0.5" title="Brillantes">
-                    <ClassIcon cls="brilliant" size={16} /> {g.brilliants ?? 0}
-                  </span>
-                  <ChevronRight className="size-4 text-muted" />
+          <li key={g.id} className="card flex gap-3 p-3">
+            <Link href={`/partidas/${g.id}`} className="w-20 shrink-0 sm:w-24" aria-label={`Abrir ${g.white} vs ${g.black}`}>
+              <MiniBoard fen={g.finalFen} orientation={g.userColor === "b" ? "black" : "white"} />
+            </Link>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex items-start gap-2">
+                <Link href={`/partidas/${g.id}`} className="min-w-0 flex-1">
+                  <Player name={g.white} elo={g.whiteElo} mine={g.userColor === "w"} />
+                  <Player name={g.black} elo={g.blackElo} mine={g.userColor === "b"} />
                 </Link>
-              ) : (
-                <Link href={`/partidas/${g.id}`} className="btn-primary px-3">
-                  <Cpu className="size-4" /> Analizar
-                </Link>
-              )}
-            </div>
-            <div className="mt-2 flex items-center gap-2 border-t border-line pt-2">
-              <label className="flex items-center gap-2 text-xs text-muted">
-                Yo soy
-                <select
-                  value={g.userColor ?? ""}
-                  onChange={(e) => setColor.mutate({ id: g.id, color: (e.target.value || null) as Color | null })}
-                  className="field min-h-11 w-auto py-0 text-sm"
+                <button
+                  type="button"
+                  aria-label={`Borrar ${g.white} vs ${g.black}`}
+                  className="btn-ghost -mt-1 -mr-1 shrink-0 px-3 hover:text-[#ffb4a8]"
+                  disabled={del.isPending}
+                  onClick={() => {
+                    if (confirm("¿Borrar esta partida? También se borran su análisis y sus ejercicios.")) del.mutate({ id: g.id });
+                  }}
                 >
-                  <option value="w">Blancas ({g.white})</option>
-                  <option value="b">Negras ({g.black})</option>
-                  <option value="">Ninguno</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                aria-label={`Borrar ${g.white} vs ${g.black}`}
-                className="btn-ghost ml-auto px-3 hover:text-[#ffb4a8]"
-                disabled={del.isPending}
-                onClick={() => {
-                  if (confirm("¿Borrar esta partida? También se borran su análisis y sus ejercicios.")) del.mutate({ id: g.id });
-                }}
-              >
-                <Trash2 className="size-4" />
-              </button>
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+              <p className="truncate text-xs text-muted">
+                {[g.result, g.timeClass, g.playedAt ? new Date(g.playedAt).toLocaleDateString("es-MX") : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <div className="mt-auto flex flex-wrap items-center gap-2">
+                {g.analyzed ? (
+                  <Link href={`/partidas/${g.id}`} className="flex min-h-11 items-center gap-2 text-sm" aria-label="Ver análisis">
+                    {g.accuracyUser !== null && (
+                      <span className="rounded bg-raised px-1.5 py-0.5 font-mono font-bold" title="Tu precisión">
+                        {g.accuracyUser.toFixed(1)}
+                      </span>
+                    )}
+                    {!!g.brilliants && (
+                      <span className="flex items-center gap-0.5" title="Brillantes">
+                        <ClassIcon cls="brilliant" size={16} /> {g.brilliants}
+                      </span>
+                    )}
+                    <ChevronRight className="size-4 text-muted" />
+                  </Link>
+                ) : (
+                  <Link href={`/partidas/${g.id}`} className="btn-primary px-3">
+                    <Cpu className="size-4" /> Analizar
+                  </Link>
+                )}
+                {/* Solo si no se pudo detectar el color (D9); al elegir uno desaparece. */}
+                {!g.userColor && (
+                  <label className="flex min-w-0 items-center gap-2 text-xs text-muted">
+                    Yo soy
+                    <select
+                      value=""
+                      disabled={setColor.isPending}
+                      onChange={(e) => e.target.value && setColor.mutate({ id: g.id, color: e.target.value as Color })}
+                      className="field min-h-11 w-auto max-w-40 min-w-0 truncate py-0 text-sm"
+                    >
+                      <option value="" disabled>
+                        Elegir…
+                      </option>
+                      <option value="w">Blancas ({g.white})</option>
+                      <option value="b">Negras ({g.black})</option>
+                    </select>
+                  </label>
+                )}
+              </div>
             </div>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function Player({ name, elo, mine }: { name: string; elo: number | null; mine: boolean }) {
+  return (
+    <p className="flex min-w-0 items-baseline gap-1 text-sm font-semibold">
+      <span className={`truncate ${mine ? "text-brand" : ""}`}>{name}</span>
+      {elo ? <span className="shrink-0 text-xs font-normal text-muted">{elo}</span> : null}
+    </p>
   );
 }

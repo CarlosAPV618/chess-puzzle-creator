@@ -9,6 +9,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
+// /practicar/<id> queda fuera: cualquiera con el enlace puede abrir el ejercicio (D5).
 export const config = {
-  matcher: ["/partidas", "/partidas/:path*", "/practicar", "/practicar/:path*"],
+  matcher: ["/partidas", "/partidas/:path*", "/practicar"],
 };

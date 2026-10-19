@@ -1,11 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { MAX_GAMES, parseGamePgn } from "~/lib/import/pgn";
 import type { Color, GameAnalysis } from "~/lib/types";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { analyses, exercises, games } from "~/server/db/schema";
+import { analyses, exercises, games, playerNames } from "~/server/db/schema";
+import { replayFens } from "~/server/services/analysis";
 import { enforceRateLimit } from "~/server/services/rate-limit";
 
 const colorSchema = z.enum(["w", "b"]);
@@ -52,6 +53,7 @@ export const gamesRouter = createTRPCRouter({
           startFen: p.startFen,
           movesUci: p.movesUci,
           movesSan: p.movesSan,
+          finalFen: p.finalFen,
         };
       });
       const key = (r: { source: string; sourceId: string }) => `${r.source}:${r.sourceId}`;
@@ -85,8 +87,11 @@ export const gamesRouter = createTRPCRouter({
         id: games.id,
         white: games.white,
         black: games.black,
+        whiteElo: games.whiteElo,
+        blackElo: games.blackElo,
         result: games.result,
         playedAt: games.playedAt,
+        finalFen: games.finalFen,
         openingName: games.openingName,
         userColor: games.userColor,
         timeClass: games.timeClass,
@@ -102,7 +107,22 @@ export const gamesRouter = createTRPCRouter({
       .from(games)
       .leftJoin(analyses, eq(analyses.gameId, games.id))
       .where(eq(games.userId, ctx.session.user.id))
-      .orderBy(sql`coalesce(${games.playedAt}, ${games.createdAt}) desc`);
+      .orderBy(sql`coalesce(${games.playedAt}, ${games.createdAt}) desc`, desc(games.createdAt));
+
+    // Rows imported before migration 0002 have no final FEN: compute and store it once (D9).
+    const missing = rows.filter((r) => r.finalFen === null).map((r) => r.id);
+    const filled = new Map<string, string>();
+    if (missing.length > 0) {
+      const old = await ctx.db
+        .select({ id: games.id, startFen: games.startFen, movesUci: games.movesUci })
+        .from(games)
+        .where(inArray(games.id, missing));
+      for (const g of old) {
+        const fen = replayFens(g.startFen, g.movesUci).at(-1)!;
+        filled.set(g.id, fen);
+        await ctx.db.update(games).set({ finalFen: fen }).where(eq(games.id, g.id));
+      }
+    }
 
     return rows.map((r) => {
       const pick = <T,>(w: T | null, b: T | null) => (r.userColor === "w" ? w : r.userColor === "b" ? b : null);
@@ -110,8 +130,11 @@ export const gamesRouter = createTRPCRouter({
         id: r.id,
         white: r.white,
         black: r.black,
+        whiteElo: r.whiteElo,
+        blackElo: r.blackElo,
         result: r.result,
         playedAt: r.playedAt?.toISOString() ?? null,
+        finalFen: r.finalFen ?? filled.get(r.id)!,
         openingName: r.openingName,
         userColor: r.userColor as Color | null,
         analyzed: r.analyzed,
@@ -181,26 +204,48 @@ export const gamesRouter = createTRPCRouter({
     return { ok: true as const };
   }),
 
-  /** Also recomputes exercises.side (me/opponent/null). */
+  /**
+   * Also recomputes exercises.side. With a color, the chosen player's name is registered in player_names
+   * and the user's other games without color where that name plays get their color too (D9).
+   */
   setUserColor: protectedProcedure
     .input(z.object({ id: z.string().uuid(), color: colorSchema.nullable() }))
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
       return ctx.db.transaction(async (tx) => {
-        const res = await tx
+        const [game] = await tx
           .update(games)
           .set({ userColor: input.color })
-          .where(and(eq(games.id, input.id), eq(games.userId, ctx.session.user.id)))
-          .returning({ id: games.id });
-        if (res.length === 0) throw notFound();
+          .where(and(eq(games.id, input.id), eq(games.userId, userId)))
+          .returning({ id: games.id, white: games.white, black: games.black });
+        if (!game) throw notFound();
+
+        const gameIds = [game.id];
+        if (input.color) {
+          const name = (input.color === "w" ? game.white : game.black).toLowerCase();
+          await tx.insert(playerNames).values({ userId, nameLower: name }).onConflictDoNothing();
+          const others = await tx
+            .update(games)
+            .set({ userColor: sql`case when lower(${games.white}) = ${name} then 'w' else 'b' end` })
+            .where(
+              and(
+                eq(games.userId, userId),
+                isNull(games.userColor),
+                or(sql`lower(${games.white}) = ${name}`, sql`lower(${games.black}) = ${name}`)
+              )
+            )
+            .returning({ id: games.id });
+          gameIds.push(...others.map((g) => g.id));
+        }
         await tx
           .update(exercises)
           .set({
-            side: input.color
-              ? sql`case when ${exercises.color} = ${input.color} then 'me' else 'opponent' end`
-              : null,
+            side: sql`(select case when ${games.userColor} is null then null
+              when ${games.userColor} = ${exercises.color} then 'me' else 'opponent' end
+              from ${games} where ${games.id} = ${exercises.gameId})`,
             updatedAt: sql`now()`,
           })
-          .where(eq(exercises.gameId, input.id));
+          .where(inArray(exercises.gameId, gameIds));
         return { ok: true as const };
       });
     }),

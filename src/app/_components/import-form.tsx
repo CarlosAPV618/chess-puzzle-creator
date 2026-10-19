@@ -24,7 +24,7 @@ const TABS: { id: Tab; label: string; icon: typeof Link2 }[] = [
 
 export function ImportForm() {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
   const logged = !!session;
   const players = api.players.list.useQuery(undefined, { enabled: logged });
   const addPlayer = api.players.add.useMutation();
@@ -43,6 +43,8 @@ export function ImportForm() {
   const [rows, setRows] = useState<Row[]>([]);
 
   const names = players.data ?? [];
+  // Sin sesión resuelta aún no se sabe si guardar o abrir en memoria: los botones esperan.
+  const waiting = busy || sessionPending;
 
   /** Abre una partida: sin cuenta en memoria (/analizar); con cuenta, se guarda y va a /partidas/[id]. */
   async function open(g: ParsedGame) {
@@ -238,7 +240,7 @@ export function ImportForm() {
           <button
             type="submit"
             className="btn-primary w-full"
-            disabled={busy || (tab === "pgn" ? !pgn.trim() : tab === "link" ? !link.trim() : !user.trim())}
+            disabled={waiting || (tab === "pgn" ? !pgn.trim() : tab === "link" ? !link.trim() : !user.trim())}
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
             {tab === "user" ? "Traer partidas" : "Analizar"}
@@ -260,12 +262,12 @@ export function ImportForm() {
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="font-bold">{rows.length === 1 ? "1 partida" : `${rows.length} partidas`}</h2>
             {logged && rows.length > 1 && (
-              <button type="button" onClick={() => void saveAll()} disabled={busy} className="btn-primary">
+              <button type="button" onClick={() => void saveAll()} disabled={waiting} className="btn-primary">
                 Guardar todas
               </button>
             )}
           </div>
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {rows.map((g, i) => (
               <li key={`${g.source}-${g.sourceId}`} className="card p-3">
                 <div className="flex items-center gap-3">
@@ -285,7 +287,7 @@ export function ImportForm() {
                     type="button"
                     aria-label={`Analizar ${g.white} vs ${g.black}`}
                     onClick={() => void open(g)}
-                    disabled={busy}
+                    disabled={waiting}
                     className="btn-secondary px-3"
                   >
                     Analizar <ChevronRight className="size-4" />
