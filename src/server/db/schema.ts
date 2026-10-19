@@ -124,6 +124,8 @@ export const games = pgTable(
     startFen: text("start_fen").notNull(),
     movesUci: text("moves_uci").array().notNull(),
     movesSan: text("moves_san").array().notNull(),
+    // Position after the last move; null on rows imported before 0002 (filled lazily by games.list).
+    finalFen: text("final_fen"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -180,7 +182,7 @@ export const exercises = pgTable(
     color: text("color", { enum: ["w", "b"] }).notNull(), // side to move in `fen`
     fen: text("fen").notNull(),
     playedUci: text("played_uci").notNull(),
-    kind: text("kind", { enum: ["mistake", "brilliant"] }).notNull(),
+    kind: text("kind", { enum: ["mistake", "brilliant", "miss"] }).notNull(),
     side: text("side", { enum: ["me", "opponent"] }),
     bestUci: text("best_uci").notNull(),
     acceptedUci: text("accepted_uci").array().notNull(),

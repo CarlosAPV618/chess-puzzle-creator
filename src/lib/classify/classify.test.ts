@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Chess } from "chess.js";
+import { uciToMove } from "../engine/uci";
 import type { Eval, PositionAnalysis } from "../types";
 import {
   accuracy,
@@ -12,6 +14,7 @@ import {
   phaseOf,
 } from "./index";
 import { lossClass, pointLoss, pointLossClassify } from "./expected-points";
+import jyon from "./fixtures/jyon-d16.json";
 
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // Same position without castling rights: not in the book (keeps tests off "Teoría").
@@ -71,29 +74,38 @@ const pos = (e: Eval, best?: string, second?: { uci: string; eval: Eval }): Posi
   pv: best ? [best] : [],
 });
 
-function missGame(afterCp: number) {
-  // 1.Nf3 (best) Nc6?? (blunder: e5 was 0.00, now +471 = EP 0.85 for White) 2.<white move>
-  return classifyGame({
+/** One White move from NO_BOOK: best e2e4 gives EP `best`, the move played (d2d4) leaves EP `after`. */
+const missCls = (best: number, after: number) =>
+  classifyGame({
     startFen: NO_BOOK,
-    movesUci: ["g1f3", "b8c6", "d2d4"],
-    positions: [
-      pos({ cp: 0 }, "g1f3"),
-      pos({ cp: 0 }, "e7e5"),
-      pos({ cp: cpFor(0.85) }, "e2e4"),
-      pos({ cp: afterCp }),
-    ],
+    movesUci: ["d2d4"],
+    positions: [pos({ cp: cpFor(best) }, "e2e4"), pos({ cp: cpFor(after) })],
     userColor: "w",
-  });
-}
+  }).moves[0]!.class;
 
-test("Miss: not punishing the opponent's blunder (spec scenarios)", () => {
-  const miss = missGame(cpFor(0.72)); // loss 0.13 -> Error by the table -> Miss
-  assert.deepEqual(
-    miss.moves.map((m) => m.class),
-    ["best", "blunder", "miss"],
-  );
-  const blunder = missGame(cpFor(0.4)); // loss 0.45 -> stays Blunder
-  assert.equal(blunder.moves[2]!.class, "blunder");
+test("Miss v3: giving up a winning position (spec scenarios)", () => {
+  assert.equal(missCls(0.69, 0.55), "miss", "not taking the advantage");
+  assert.equal(missCls(0.9, 0.77), "mistake", "still winning -> classified by its loss");
+  assert.equal(missCls(0.6, 0.54), "inaccuracy", "no winning position");
+  assert.equal(missCls(0.85, 0.4), "blunder", "Blunder stays Blunder");
+  // Black (evals are White POV); no previous opponent mistake is required.
+  const black = classifyGame({
+    startFen: NO_BOOK.replace(" w ", " b "),
+    movesUci: ["d7d5"],
+    positions: [pos({ cp: -cpFor(0.69) }, "e7e5"), pos({ cp: -cpFor(0.55) })],
+    userColor: "b",
+  });
+  assert.equal(black.moves[0]!.class, "miss");
+});
+
+test("Miss v3: reference game CarlosAPV vs jyonGM53 at depth 16 (8.Bb5, 11.Bg5, 12.Qa4)", () => {
+  const { movesUci, positions } = jyon as { movesUci: string[]; positions: PositionAnalysis[] };
+  const { moves } = classifyGame({ startFen: START, movesUci, positions, userColor: "w" });
+  const chess = new Chess();
+  const san = movesUci.map((u) => chess.move(uciToMove(u)).san);
+  const whiteMisses = moves.flatMap((m, ply) => (ply % 2 === 0 && m.class === "miss" ? [ply] : []));
+  assert.deepEqual(whiteMisses, [14, 20, 22]);
+  assert.deepEqual(whiteMisses.map((p) => `${p / 2 + 1}.${san[p]}`), ["8.Bb5", "11.Bg5", "12.Qa4"]);
 });
 
 test("Forced, Great, and capturing hanging material is not Great", () => {

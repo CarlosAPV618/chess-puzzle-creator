@@ -11,6 +11,8 @@ export type ParsedPgnGame = Omit<ParsedGame, "sourceId" | "userColor"> & {
   sourceId: string | null;
   headers: Record<string, string>;
   openingName: string | null;
+  /** FEN after the last move (thumbnail in "Mis partidas"). */
+  finalFen: string;
 };
 
 export type ParseResult =
@@ -199,6 +201,7 @@ export function parseGamePgn(text: string): ParseResult {
       movesSan,
       headers,
       openingName: opening || null,
+      finalFen: chess.fen(),
     },
   };
 }
@@ -213,7 +216,7 @@ export async function pgnHash(g: ParsedPgnGame): Promise<string> {
 }
 
 export async function toParsedGame(g: ParsedPgnGame, userColor: Color | null = null): Promise<ParsedGame> {
-  const { headers: _h, openingName: _o, ...rest } = g;
+  const { headers: _h, openingName: _o, finalFen: _f, ...rest } = g;
   return { ...rest, sourceId: g.sourceId ?? (await pgnHash(g)), userColor };
 }
 

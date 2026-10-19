@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   applicationName: "Chess Puzzle Creator Pro",
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/icons/icon.svg", type: "image/svg+xml" }],
-    apple: "/icons/apple-touch-icon.png",
+    apple: "/icons/apple-touch-icon-v2.png",
   },
   appleWebApp: { capable: true, title: "Chess Puzzle", statusBarStyle: "black-translucent" },
 };

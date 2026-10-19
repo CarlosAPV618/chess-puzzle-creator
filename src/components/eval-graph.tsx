@@ -9,7 +9,8 @@ const MARKED: Classification[] = ["brilliant", "great", "miss", "mistake", "blun
 
 /**
  * Gráfica de evaluación (desde blancas). `evals` tiene N+1 puntos; los que faltan
- * (análisis en curso) se dejan fuera. Tocar o deslizar lleva a esa jugada.
+ * (análisis en curso) se dejan fuera. Con mouse, clic o arrastre lleva a esa jugada; en táctil solo un
+ * toque (< 8 px, sin pointercancel), para que deslizar el dedo haga scroll de la página.
  */
 export function EvalGraph({
   evals,
@@ -25,6 +26,7 @@ export function EvalGraph({
   onSelect: (ply: number) => void;
 }) {
   const ref = useRef<SVGSVGElement>(null);
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const n = Math.max(1, evals.length - 1);
   const W = 600;
   const H = 100;
@@ -51,7 +53,7 @@ export function EvalGraph({
         ref={ref}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        className="block h-16 w-full cursor-pointer touch-none rounded-md bg-[#3b3f3c] sm:h-20"
+        className="block h-16 w-full cursor-pointer touch-pan-y rounded-md bg-[#3b3f3c] sm:h-20"
         role="slider"
         aria-label="Gráfica de evaluación"
         aria-valuemin={0}
@@ -59,10 +61,20 @@ export function EvalGraph({
         aria-valuenow={ply}
         tabIndex={0}
         onPointerDown={(e) => {
+          if (e.pointerType === "touch") {
+            touch.current = { x: e.clientX, y: e.clientY };
+            return;
+          }
           e.currentTarget.setPointerCapture(e.pointerId);
           pick(e.clientX);
         }}
-        onPointerMove={(e) => e.buttons && pick(e.clientX)}
+        onPointerMove={(e) => e.pointerType !== "touch" && e.buttons && pick(e.clientX)}
+        onPointerUp={(e) => {
+          const t = touch.current;
+          touch.current = null;
+          if (e.pointerType === "touch" && t && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 8) pick(e.clientX);
+        }}
+        onPointerCancel={() => (touch.current = null)}
       >
         <path d={area} fill="#f2f3ee" />
         <line x1={0} x2={W} y1={H / 2} y2={H / 2} stroke="#888" strokeWidth={1} strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />

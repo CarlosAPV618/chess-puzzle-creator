@@ -8,9 +8,8 @@ import { expectedPoints, phaseOf } from "~/lib/classify";
 import {
   CLASSIFICATIONS,
   type Color,
-  type Eval,
+  type ExerciseKind,
   type GameAnalysis,
-  type Phase,
 } from "~/lib/types";
 import type { Db } from "~/server/db";
 import { analyses, exercises, games } from "~/server/db/schema";
@@ -96,7 +95,10 @@ export function validateAnalysis(fens: string[], movesUci: string[], a: GameAnal
 
 export type ExerciseRow = typeof exercises.$inferInsert;
 
-/** D9: mistake (blunder/miss, both sides) and brilliant (played or missed, exerciseEligible). */
+/**
+ * Exercise kinds (design D3), one per ply with this priority: missed brilliant -> miss,
+ * played brilliant -> brilliant, blunder -> mistake, classified Miss -> miss.
+ */
 export function buildExercises(
   game: { id: string; userId: string; userColor: Color | null; movesUci: string[] },
   fens: string[],
@@ -108,24 +110,24 @@ export function buildExercises(
     const fen = fens[ply]!;
     const color = fen.split(" ")[1] as Color;
     const playedUci = game.movesUci[ply]!;
-    let kind: "mistake" | "brilliant";
+    let kind: ExerciseKind;
     let bestUci: string;
     let acceptedUci: string[];
     let brilliantPlayed: boolean | null = null;
 
-    if (m.brilliant?.exerciseEligible) {
+    if (m.brilliantMissed?.exerciseEligible) {
+      // Also covers "blunder + missed brilliant": one miss exercise with the brilliant as the only answer.
+      kind = "miss";
+      bestUci = m.brilliantMissed.uci;
+      acceptedUci = [bestUci];
+      brilliantPlayed = false;
+    } else if (m.brilliant?.exerciseEligible) {
       kind = "brilliant";
       bestUci = playedUci;
       acceptedUci = [playedUci];
       brilliantPlayed = true;
-    } else if (m.brilliantMissed?.exerciseEligible) {
-      // Also covers "mistake + missed brilliant": one brilliant exercise with the error's refutation.
-      kind = "brilliant";
-      bestUci = m.brilliantMissed.uci;
-      acceptedUci = [bestUci];
-      brilliantPlayed = false;
     } else if ((m.class === "blunder" || m.class === "miss") && pos.best && pos.best.uci !== playedUci) {
-      kind = "mistake";
+      kind = m.class === "blunder" ? "mistake" : "miss";
       bestUci = pos.best.uci;
       acceptedUci = [bestUci];
       const s = pos.second;

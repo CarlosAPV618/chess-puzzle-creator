@@ -45,3 +45,7 @@ public/swe-worker-*
 .claude/*.lock
 .claude/settings.local.json
 .claude/skills/
+
+# playwright
+/test-results/
+/playwright-report/

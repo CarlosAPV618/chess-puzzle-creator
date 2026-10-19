@@ -11,6 +11,8 @@ export { isBook, lookupOpening } from "./openings";
 
 /** Pérdida de EP a partir de la cual una jugada del libro deja de contar como Teoría (umbral de Error). */
 const BOOK_MAX_LOSS = 0.1;
+/** EP (≈ +1.3) desde el que una posición cuenta como ganadora para la Oportunidad perdida (design D1). */
+export const MISS_WIN = 0.62;
 
 /** Bump when classification rules change (lets the server/UI offer a re-analysis). */
 export { CLASSIFIER_VERSION } from "./version";
@@ -46,7 +48,6 @@ export function classifyGame(input: ClassifyInput): {
   // Games from a custom FEN get no opening book (design D6).
   let inBook = bookKey(startFen) === bookKey(DEFAULT_POSITION);
   const moves: MoveAnalysis[] = [];
-  const baseClasses: Classification[] = [];
   const candidates: BrilliantCandidate[] = [];
 
   movesUci.forEach((uci, ply) => {
@@ -82,7 +83,6 @@ export function classifyGame(input: ClassifyInput): {
       cls = isGreat(c) ? "great" : "best";
       if (isBrilliant(c)) candidates.push({ ply, uci, played: true, color: mover, gain });
     } else cls = pointLossClassify(bestEval, next.eval, mover);
-    baseClasses.push(cls);
 
     // Brilliant available but not played: same detection on the engine's move.
     if (!topPlayed && pos.best && legalCount > 1 && cls !== "book") {
@@ -97,12 +97,12 @@ export function classifyGame(input: ClassifyInput): {
       }
     }
 
-    // Miss: failing to punish the opponent's mistake (design D4). Blunder stays Blunder.
+    // Miss (design D1, v3): the best move kept a winning position and the move played gave it up.
+    // Blunder stays Blunder; keeping the win is classified by its loss alone.
     if (
       (cls === "inaccuracy" || cls === "mistake") &&
-      ply > 0 &&
-      (baseClasses[ply - 1] === "mistake" || baseClasses[ply - 1] === "blunder") &&
-      expectedPoints(bestEval, mover) >= 0.75
+      expectedPoints(bestEval, mover) >= MISS_WIN &&
+      expectedPoints(next.eval, mover) < MISS_WIN
     ) {
       cls = "miss";
     }

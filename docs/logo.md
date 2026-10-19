@@ -6,9 +6,14 @@ your own games become puzzle pieces. One silhouette, one colour, readable at 16 
 
 ## Files
 - `public/icons/icon.svg` — master mark (256 grid, rounded tile r=56). Source of truth.
-- `public/icons/icon-192.png`, `icon-512.png` — `purpose: any` (transparent corners).
-- `public/icons/maskable-512.png` — full-bleed green, mark at 60% (inside the 80% safe zone).
-- `public/icons/apple-touch-icon.png` — 180x180, full-bleed green, mark at 78%.
+- `public/icons/icon-192-v2.png`, `icon-512-v2.png` — `purpose: any` (transparent corners), rendered from `icon.svg`.
+- `public/icons/maskable-512-v2.png` — full-bleed green tile, mark 61.5% tall, farthest point 38.3% from
+  the centre (inside the 40%-radius maskable safe circle).
+- `public/icons/apple-touch-icon-v2.png` — 180x180, full-bleed green tile, mark 68% tall.
+- Maskable and apple are `icon.svg`'s mark on a square `#7fb24a` tile, scaled around the mark centre:
+  `<g transform="translate(128 128) scale(S) translate(-128 -129)">` with S = 0.869 (maskable) and 0.97 (apple).
+- When a raster icon changes, bump its file name (`-v3`…) in `manifest.ts`/`layout.tsx` so Android
+  regenerates the installed icon.
 - `public/favicon.ico` — 16/32/48 from `icon.svg`.
 - `src/components/logo.tsx` — `LogoMark` (inline SVG, aria-hidden) and `Logo` (mark + wordmark).
 
