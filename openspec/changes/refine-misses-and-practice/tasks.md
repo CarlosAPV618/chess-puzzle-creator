@@ -82,7 +82,7 @@
 
 - [x] 9.1 `pnpm typecheck`, `pnpm test` y `pnpm build`
 - [x] 9.2 Escaneo de secretos antes del push; PR
-- [ ] 9.3 `pnpm db:migrate` (0002) contra Neon antes del merge; después, deploy y smoke test en producción
+- [x] 9.3 `pnpm db:migrate` (0002) contra Neon antes del merge; después, deploy y smoke test en producción
 
 ## 10. Después (aplazado por el usuario)
 
