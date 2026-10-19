@@ -1,7 +1,7 @@
 // analysis.save server side (D8 validation + D9 exercise generation).
 import { TRPCError } from "@trpc/server";
 import { Chess } from "chess.js";
-import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, notInArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { expectedPoints, phaseOf } from "~/lib/classify";
 
@@ -172,6 +172,9 @@ function countsByColor(fens: string[], a: GameAnalysis) {
   return c;
 }
 
+/** Board, side to move, castling and en passant: the clocks don't change the exercise. */
+export const positionKey = (fen: string) => fen.split(" ").slice(0, 4).join(" ");
+
 /** Validate, replace the analysis and sync exercises in ONE transaction. */
 export async function saveAnalysis(
   db: Db,
@@ -189,7 +192,7 @@ export async function saveAnalysis(
   const err = validateAnalysis(fens, game.movesUci, a);
   if (err) throw new TRPCError({ code: "BAD_REQUEST", message: err });
 
-  const rows = buildExercises(game, fens, a);
+  const built = buildExercises(game, fens, a);
   const analysisRow = {
     gameId,
     depth: a.depth,
@@ -204,6 +207,20 @@ export async function saveAnalysis(
   };
 
   return db.transaction(async (tx) => {
+    // One exercise per position per user: a position already active in another game (same game
+    // imported twice, repeated opening) or repeated within this game is not duplicated.
+    const others = await tx
+      .select({ fen: exercises.fen })
+      .from(exercises)
+      .where(and(eq(exercises.userId, userId), ne(exercises.gameId, gameId), isNull(exercises.archivedAt)));
+    const seen = new Set(others.map((o) => positionKey(o.fen)));
+    const rows = built.filter((r) => {
+      const k = positionKey(r.fen);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
     await tx.insert(analyses).values(analysisRow).onConflictDoUpdate({ target: analyses.gameId, set: analysisRow });
 
     let created = 0;

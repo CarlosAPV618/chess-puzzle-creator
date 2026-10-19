@@ -85,7 +85,7 @@ export function EvalGraph({
           <span
             key={i}
             aria-hidden
-            className="pointer-events-none absolute size-2 -translate-1/2 rounded-full ring-1 ring-black/60"
+            className="pointer-events-none absolute size-2 -translate-1/2 rounded-full"
             style={{ left: `${(x(i + 1) / W) * 100}%`, top: `${(y(i + 1) / H) * 100}%`, background: CLASS_META[c].color }}
           />
         ) : null,

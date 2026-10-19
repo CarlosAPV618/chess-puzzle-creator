@@ -153,7 +153,11 @@ export const gamesRouter = createTRPCRouter({
 
   get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
     const [row] = await ctx.db
-      .select({ game: games, analysis: analyses })
+      .select({
+        game: games,
+        analysis: analyses,
+        exerciseCount: sql<number>`(select count(*)::int from ${exercises} where ${exercises.gameId} = ${games.id} and ${exercises.archivedAt} is null)`,
+      })
       .from(games)
       .leftJoin(analyses, eq(analyses.gameId, games.id))
       .where(and(eq(games.id, input.id), eq(games.userId, ctx.session.user.id)));
@@ -191,6 +195,7 @@ export const gamesRouter = createTRPCRouter({
         movesSan: g.movesSan,
       },
       analysis,
+      exerciseCount: row.exerciseCount,
     };
   }),
 

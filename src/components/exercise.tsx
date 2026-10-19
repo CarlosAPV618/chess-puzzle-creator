@@ -115,10 +115,6 @@ export function ExerciseView({
     fix({ firstTryCorrect: false, usedHint: hint, viewedSolution: true });
   }
 
-  const refutation =
-    ex.kind !== "brilliant" && ex.playedUci !== ex.bestUci && ex.refutationPv.length
-      ? () => lineFrom("Lo que podía pasar", ex.fen, [ex.playedUci, ...ex.refutationPv])
-      : null;
   const bestLine = () => lineFrom("Mejor línea", ex.fen, ex.bestPv[0] === ex.bestUci ? ex.bestPv : [ex.bestUci]);
   function open(l: Line) {
     setLine(l);
@@ -141,12 +137,12 @@ export function ExerciseView({
   const lastUci = line ? line.moves[step] || (step === 0 ? opponentLast : null) : (tried ?? opponentLast);
   const badge = line
     ? step === 1
-      ? { square: uciTo(line.moves[1]!), cls: line.label === "Mejor línea" ? goodCls : originCls }
+      ? { square: uciTo(line.moves[1]!), cls: goodCls }
       : null
     : phase === "done" && correct && tried
       ? { square: uciTo(tried), cls: goodCls }
       : null;
-  const evalShown: Eval | undefined = (line && step > 0 && line.label !== "Mejor línea" ? ex.evalAfter : ex.evalBefore) ?? undefined;
+  const evalShown: Eval | undefined = ex.evalBefore ?? undefined;
   const arrows =
     solution && !line ? [{ startSquare: uciFrom(ex.bestUci), endSquare: uciTo(ex.bestUci), color: "rgba(127,178,74,.9)" }] : [];
 
@@ -229,23 +225,18 @@ export function ExerciseView({
               )}
               {phase === "done" && (
                 <>
-                  {refutation && (
-                    <button type="button" onClick={() => open(refutation())} className="btn-secondary">
-                      Lo que podía pasar
-                    </button>
-                  )}
                   <button type="button" onClick={() => open(bestLine())} className="btn-secondary">
                     Mejor línea
                   </button>
-                  {ex.gameId && (
-                    <Link href={`/partidas/${ex.gameId}`} className="btn-ghost">
-                      <ExternalLink className="size-4" /> Ver en la partida
-                    </Link>
-                  )}
                   {onNext && (
                     <button type="button" onClick={onNext} className="btn-primary">
                       Siguiente
                     </button>
+                  )}
+                  {ex.gameId && (
+                    <Link href={`/partidas/${ex.gameId}`} className="btn-ghost">
+                      <ExternalLink className="size-4" /> Ver en la partida
+                    </Link>
                   )}
                 </>
               )}

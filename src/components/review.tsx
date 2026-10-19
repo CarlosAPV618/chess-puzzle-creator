@@ -66,6 +66,7 @@ export function GameReview({
   analysis,
   liveEvals,
   toolbar,
+  actions,
 }: {
   game: ReviewGame;
   analysis: GameAnalysis | null;
@@ -73,6 +74,8 @@ export function GameReview({
   liveEvals?: Eval[];
   /** Controles de la página (analizar, guardar, aviso de reanálisis...): arriba sin análisis, debajo del resumen con él. */
   toolbar?: ReactNode;
+  /** Botones extra de la fila bajo el tablero (p. ej. "Practicar esta partida"). */
+  actions?: ReactNode;
 }) {
   const { fens, sans } = useMemo(() => replay(game.startFen, game.movesUci), [game.startFen, game.movesUci]);
   const N = game.movesUci.length;
@@ -304,7 +307,7 @@ export function GameReview({
       {/* Columna del tablero */}
       <div
         ref={colRef}
-        className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] scroll-mt-[calc(4rem+env(safe-area-inset-top))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-9rem))]"
+        className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] scroll-mt-[calc(4rem+env(safe-area-inset-top))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-15rem))]"
       >
         {player(topIsWhite)}
         <div ref={boardRef} className="flex gap-1.5">
@@ -323,6 +326,24 @@ export function GameReview({
           </div>
         </div>
         {player(!topIsWhite)}
+        <div className="flex flex-wrap gap-2">
+          {analysis &&
+            (review && !review.finished ? (
+              <button type="button" onClick={exitReview} className="btn-secondary">
+                <X className="size-4" /> Salir del repaso
+              </button>
+            ) : (
+              !review && (
+                <button type="button" onClick={() => startReview(reviewSide)} className="btn-secondary">
+                  <GraduationCap className="size-4" /> Repasar partida
+                </button>
+              )
+            ))}
+          <button type="button" aria-label="Girar tablero" title="Girar tablero" onClick={() => setFlipped(!flipped)} className="btn-secondary px-3">
+            <RefreshCw className="size-4" />
+          </button>
+          {actions}
+        </div>
       </div>
 
       {/* Panel */}
@@ -428,58 +449,17 @@ export function GameReview({
           <MoveList sans={sans} classes={classes} ply={ply} startsWithBlack={firstColor === "b"} startMoveNumber={Number(game.startFen.split(" ")[5] ?? 1)} onSelect={goto} />
         </div>
 
-        {/* Por debajo de lg, Repasar y Girar viven en la barra fija (abajo). */}
-        <div className="hidden flex-wrap gap-2 lg:flex">
-          {analysis && !review && (
-            <button type="button" onClick={() => startReview(reviewSide)} className="btn-secondary">
-              <GraduationCap className="size-4" /> Repasar partida
-            </button>
-          )}
-          {review && !review.finished && (
-            <button type="button" onClick={exitReview} className="btn-secondary">
-              Salir del repaso
-            </button>
-          )}
-          <button type="button" aria-label="Girar tablero" title="Girar tablero" onClick={() => setFlipped(!flipped)} className="btn-secondary px-3">
-            <RefreshCw className="size-4" />
-          </button>
-        </div>
-
         {analysis && (
           <Summary analysis={analysis} white={game.white} black={game.black} firstColor={firstColor} />
         )}
 
         {analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
 
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 flex gap-1.5 border-t border-line bg-ink/95 px-3 py-2 backdrop-blur md:bottom-0 lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
-          <div className="min-w-0 flex-1">
-            <NavBar ply={ply} max={N} onChange={goto} />
-          </div>
-          {analysis &&
-            (review ? (
-              <BarButton label="Salir del repaso" onClick={exitReview} Icon={X} />
-            ) : (
-              <BarButton label="Repasar partida" onClick={() => startReview(reviewSide)} Icon={GraduationCap} />
-            ))}
-          <BarButton label="Girar tablero" onClick={() => setFlipped(!flipped)} Icon={RefreshCw} />
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-ink/95 px-3 py-2 backdrop-blur md:bottom-0 lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
+          <NavBar ply={ply} max={N} onChange={goto} />
         </div>
       </div>
     </div>
-  );
-}
-
-/** Botón de icono de la barra fija; solo por debajo de lg (en escritorio están en el panel). */
-function BarButton({ label, onClick, Icon }: { label: string; onClick: () => void; Icon: typeof X }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="flex h-12 w-11 shrink-0 items-center justify-center rounded-md bg-raised text-fg transition hover:bg-line active:scale-95 lg:hidden"
-    >
-      <Icon className="size-5" />
-    </button>
   );
 }
 

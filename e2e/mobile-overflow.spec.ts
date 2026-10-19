@@ -73,4 +73,16 @@ test("no horizontal overflow on mobile", async ({ page }) => {
   for (const w of WIDTHS)
     for (const path of ["/partidas", `/partidas/${gameId}`, "/practicar", `/practicar/${exerciseId}`])
       await expectNoOverflow(page, path, w);
+
+  // "Practicar esta partida" sits under the board and goes straight to the session, not the list.
+  for (const width of [360, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(`/partidas/${gameId}`);
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("link", { name: "Practicar esta partida" }).waitFor();
+    await page.screenshot({ path: `test-results/partida-${width}.png` });
+  }
+  await page.getByRole("link", { name: "Practicar esta partida" }).click();
+  await expect(page.getByRole("progressbar", { name: "Progreso de la sesión" })).toBeVisible();
+  await page.screenshot({ path: "test-results/sesion-1280.png" });
 });

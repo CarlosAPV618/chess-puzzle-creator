@@ -308,7 +308,15 @@ test("lists, queue order, byId and the not-due rule (second user)", async () => 
   const g1 = await importOne(C, variant("g1aaaaaa", "2024.01.05"), "w");
   const g2 = await importOne(C, variant("g2aaaaaa", "2024.03.01"), "w");
   const g3 = await importOne(C, variant("g3aaaaaa", "2024.02.01"), "w");
-  for (const id of [g1, g2, g3]) await callerFor(C).analysis.save({ gameId: id, analysis: baseAnalysis() });
+  // Same moves in the 3 games: tag each game's positions (en passant field) so the
+  // one-exercise-per-position rule doesn't skip g2/g3.
+  for (const [i, id] of [g1, g2, g3].entries()) {
+    await callerFor(C).analysis.save({ gameId: id, analysis: baseAnalysis() });
+    await db
+      .update(exercises)
+      .set({ fen: sql`regexp_replace(${exercises.fen}, '^(\\S+ \\S+ \\S+) \\S+', ${`\\1 g${i}`})` })
+      .where(eq(exercises.gameId, id));
+  }
   const c = callerFor(C);
 
   // games.list: most recent first, final FEN, lazily filled for old rows.
@@ -389,6 +397,28 @@ test("lists, queue order, byId and the not-due rule (second user)", async () => 
   assert.deepEqual([r.box, r.dueAt], [2, dueAt.toISOString()]);
   const [row] = await db.select().from(exercises).where(eq(exercises.id, exId));
   assert.deepEqual([row!.box, row!.attempts, row!.solvedCount], [2, 2, 1]);
+});
+
+test("one exercise per position: the same game imported twice doesn't duplicate; queue by game", async () => {
+  const D = await createUser();
+  const c = callerFor(D);
+  const g1 = await importOne(D, variant("d1aaaaaa", "2024.01.05"), "w");
+  const g2 = await importOne(D, variant("d2aaaaaa", "2024.02.05"), "w");
+  await c.analysis.save({ gameId: g1, analysis: baseAnalysis() });
+  await c.analysis.save({ gameId: g2, analysis: baseAnalysis() });
+  assert.equal((await c.games.get({ id: g1 })).exerciseCount, 5);
+  assert.equal((await c.games.get({ id: g2 })).exerciseCount, 0);
+  assert.equal((await c.practice.list({})).total, 5);
+
+  // By game: all of them, mastered or not due included, in move order.
+  await db.update(exercises).set({ box: 5, attempts: 3, dueAt: sql`now() + interval '9 days'` }).where(and(eq(exercises.gameId, g1), eq(exercises.ply, 5)));
+  assert.deepEqual((await c.practice.queue({ gameId: g1 })).map((e) => e.ply), [0, 2, 5, 9, 10]);
+  assert.equal((await c.practice.queue({})).length, 4);
+
+  // Once the first copy is gone, re-analyzing the second one creates them.
+  await c.games.delete({ id: g1 });
+  await c.analysis.save({ gameId: g2, analysis: baseAnalysis() });
+  assert.equal((await c.games.get({ id: g2 })).exerciseCount, 5);
 });
 
 test("practice.byId rate limit: 60/min per IP without a session", async () => {

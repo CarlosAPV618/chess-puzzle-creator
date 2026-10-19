@@ -145,11 +145,16 @@ export const practiceRouter = createTRPCRouter({
         .where(
           and(
             ...ownerFilters(ctx.session.user.id, input),
-            lt(e.box, MASTERED_BOX),
-            or(lte(e.dueAt, sql`now()`), eq(e.attempts, 0))
+            // "Practicar esta partida": all of that game's exercises, due or not, in move order.
+            input.gameId ? undefined : lt(e.box, MASTERED_BOX),
+            input.gameId ? undefined : or(lte(e.dueAt, sql`now()`), eq(e.attempts, 0))
           )
         )
-        .orderBy(sql`(${e.attempts} = 0)`, sql`case when ${e.attempts} > 0 then ${e.dueAt} end`, ...recentOrder)
+        .orderBy(
+          ...(input.gameId
+            ? [asc(e.ply)]
+            : [sql`(${e.attempts} = 0)`, sql`case when ${e.attempts} > 0 then ${e.dueAt} end`, ...recentOrder])
+        )
         .limit(input.limit);
       return rows.map((r) => toDTO(r, true));
     }),

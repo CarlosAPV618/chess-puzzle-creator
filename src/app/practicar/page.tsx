@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, Flame, Loader2, Play, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { ClassIcon } from "~/components/class-icon";
 import { EngineNotice } from "~/components/engine-notice";
 import { ExerciseView, type Exercise, type Outcome } from "~/components/exercise";
@@ -30,6 +30,8 @@ function Practice() {
   const side = lado === "mias" || lado === "rivales" ? SIDES[lado] : undefined;
   // `game` es el nombre viejo del parámetro; se acepta para no romper enlaces.
   const gameId = params.get("partida") ?? params.get("game") ?? undefined;
+  // "Practicar esta partida" (desde la partida): arranca la sesión sin pasar por la lista.
+  const direct = !!gameId && params.has("iniciar");
   const page = Math.min(9999, Math.max(1, Math.trunc(Number(params.get("pagina"))) || 1));
   const [session, setSession] = useState<Exercise[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,7 +59,7 @@ function Practice() {
     setLoading(true);
     setError(null);
     try {
-      setSession(await utils.practice.queue.fetch({ side, gameId, limit: 10 }, { staleTime: 0 }));
+      setSession(await utils.practice.queue.fetch({ side, gameId, limit: gameId ? 50 : 10 }, { staleTime: 0 }));
     } catch (e) {
       setError(netError(e, "No se pudieron cargar los ejercicios"));
     } finally {
@@ -65,11 +67,29 @@ function Practice() {
     }
   }
 
+  useEffect(() => {
+    if (direct) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una sola vez al entrar
+  }, []);
+
+  if (direct && !session)
+    return error ? (
+      <div className="card mx-auto mt-10 max-w-md p-6 text-center">
+        <p className="font-semibold">{error}</p>
+        <Link href={`/partidas/${gameId}`} className="btn-secondary mt-4">
+          Volver a la partida
+        </Link>
+      </div>
+    ) : (
+      <Loader2 className="mx-auto mt-16 size-6 animate-spin text-muted" aria-label="Cargando" />
+    );
+
   if (session)
     return (
       <Session
         list={session}
         onExit={() => {
+          if (direct) return router.push(`/partidas/${gameId}`);
           setSession(null);
           void summary.refetch();
           void utils.practice.list.invalidate();

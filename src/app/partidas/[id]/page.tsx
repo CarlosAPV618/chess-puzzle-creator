@@ -28,10 +28,11 @@ export default function SavedGamePage() {
   async function persist(a: GameAnalysis) {
     setNote(null);
     try {
-      const r = await save.mutateAsync({ gameId: id, analysis: a });
+      await save.mutateAsync({ gameId: id, analysis: a });
       setLastRun(null);
-      setNote(r.exercisesCreated ? r.exercisesCreated === 1 ? "1 ejercicio nuevo en Practicar" : `${r.exercisesCreated} ejercicios nuevos en Practicar` : "Análisis guardado");
+
       void utils.games.list.invalidate();
+      void utils.games.get.invalidate({ id });
     } catch (e) {
       setLastRun(a);
       setNote(netError(e, "No se pudo guardar el análisis"));
@@ -72,6 +73,13 @@ export default function SavedGamePage() {
         game={game}
         analysis={analysis}
         liveEvals={state.status === "running" ? liveEvals : undefined}
+        actions={
+          q.data?.exerciseCount ? (
+            <Link href={`/practicar?partida=${id}&iniciar=1`} className="btn-primary">
+              <Puzzle className="size-4" /> Practicar esta partida
+            </Link>
+          ) : null
+        }
         toolbar={
           <>
             {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
@@ -88,14 +96,10 @@ export default function SavedGamePage() {
             {note && (
               <p className="flex w-full flex-wrap items-center gap-2 text-sm" role="status">
                 {note}
-                {lastRun ? (
+                {lastRun && (
                   <button type="button" className="btn-secondary" onClick={() => void persist(lastRun)}>
                     Reintentar guardado
                   </button>
-                ) : (
-                  <Link href={`/practicar?partida=${id}`} className="btn-ghost text-brand">
-                    <Puzzle className="size-4" /> Practicar esta partida
-                  </Link>
                 )}
               </p>
             )}
