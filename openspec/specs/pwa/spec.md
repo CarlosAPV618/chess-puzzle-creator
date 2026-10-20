@@ -4,7 +4,7 @@
 TBD - created by archiving change add-chess-analyzer. Update Purpose after archive.
 ## Requirements
 ### Requirement: App instalable
-La app SHALL publicar un web manifest ("Chess Puzzle Creator Pro", `display: standalone`, iconos 192, 512 y maskable) y un service worker, de modo que sea instalable en Android, escritorio e iOS desde `chess-puzzle-creator-pro.vercel.app`.
+La app SHALL publicar un web manifest ("AjedrezLab", `display: standalone`, iconos 192, 512 y maskable) y un service worker, de modo que sea instalable en Android, escritorio e iOS desde `ajedrezlab.vercel.app`.
 
 El icono maskable SHALL llevar el caballo centrado y lo más grande posible sin salir del círculo seguro (radio 40 % del lienzo; hoy ocupa 42 % de alto y llega al 27 %), con el mismo verde del SVG. Al cambiar un icono, su nombre de archivo SHALL cambiar, para que Android regenere el icono de la app instalada.
 

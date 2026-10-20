@@ -9,7 +9,7 @@ import { rateLimit } from "~/server/services/rate-limit";
 
 const FAIL = "No pudimos traer esta partida. Pega el PGN o importa por usuario";
 const USERNAME_RE = /^[A-Za-z0-9_-]{1,50}$/;
-const UA = "chess-puzzle-creator/0.1 (+https://chess-puzzle-creator-pro.vercel.app)";
+const UA = "ajedrezlab/0.1 (+https://ajedrezlab.vercel.app)";
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, {
