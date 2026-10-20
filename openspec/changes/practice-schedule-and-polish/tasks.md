@@ -122,16 +122,16 @@
   - tras 5 clics en ▶, `window.scrollY` no cambia;
   - "Practicar partida" abre la sesión.
   - Fuera de alcance por costo: tarjeta clicable de `/partidas`, carga por scroll y el barrido de desbordamiento a 360/390 px.
-- [ ] 8.2 `pnpm typecheck`, `pnpm test`, `pnpm build` y `pnpm test:e2e`.
+- [x] 8.2 `pnpm typecheck`, `pnpm test`, `pnpm build` y `pnpm test:e2e`.
 - [ ] 8.3 `[POR VERIFICAR]` en Vercel → Settings → Environment Variables si `DATABASE_URL` de Preview es la de producción. Si lo es, no practicar en el preview antes del merge (D2, riesgos).
-- [ ] 8.4 Despliegue, en este orden (D2):
+- [x] 8.4 Despliegue, en este orden (D2):
   1. escaneo de secretos y PR;
   2. respaldo en Neon (`create table exercises_box_backup_20261019 as select id, box, due_at from exercises`) y reparto de `box`;
   3. merge y deploy;
   4. justo después, `pnpm db:migrate` (0003);
   5. comprobar que no queda `box > 3`;
   6. `update exercises set box = 0, due_at = now()` en el ejercicio de O-O (JihadGhaziri, ply 20, D1).
-- [ ] 8.5 Smoke test en producción:
+- [x] 8.5 Smoke test en producción:
   - el ejercicio de O-O rechaza O-O;
   - "Empezar" cambia de orden al repetirlo;
   - menú hamburguesa en el celular.
