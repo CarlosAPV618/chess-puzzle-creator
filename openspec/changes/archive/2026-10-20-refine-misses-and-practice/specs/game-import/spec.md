@@ -17,6 +17,10 @@ Una partida con color detectado no SHALL ofrecer el selector.
 - **AND** `carlos_mx` queda registrado
 - **AND** sus otras partidas sin color donde juega `Carlos_MX` reciben su color
 
+#### Scenario: Corregir el color
+- **WHEN** el usuario cambia el color de una partida de blancas a negras (`games.setUserColor`)
+- **THEN** sus ejercicios con `side = me` pasan a `opponent` y viceversa
+
 #### Scenario: PGN de partida propia
 - **WHEN** se importa un PGN con White `Carlos_MX` y el usuario ya registró `carlos_mx` como su nombre
 - **THEN** `user_color` se asigna a blancas sin preguntar

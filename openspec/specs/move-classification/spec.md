@@ -125,19 +125,33 @@ El repositorio SHALL incluir un set de posiciones etiquetadas con evals fijas (B
 - **THEN** el test falla
 
 ### Requirement: Oportunidad perdida
-Una jugada clasificada Imprecisión o Error por la tabla SHALL pasar a Oportunidad perdida si:
-- la jugada previa del rival fue Error o Blunder;
-- la mejor jugada daría EP ≥ 0.75.
+Una jugada clasificada Imprecisión o Error por la tabla SHALL pasar a Oportunidad perdida si, para el bando que mueve:
+- la mejor jugada daba una posición ganadora: EP ≥ `MISS_WIN`;
+- tras la jugada hecha, la posición deja de serlo: EP < `MISS_WIN`.
 
-Un Blunder SHALL seguir siendo Blunder.
+`MISS_WIN` SHALL ser 0.62 (≈ +1.3), calibrado con revisiones de chess.com (design D1). No SHALL exigirse que la jugada previa del rival haya sido un Error.
 
-#### Scenario: No castigar el blunder rival
-- **WHEN** el rival deja una pieza colgada, capturarla daría EP 0.85 y el usuario juega una jugada que deja EP 0.72 (pérdida 0.13, Error por la tabla)
+Un Blunder SHALL seguir siendo Blunder. Una jugada que conserva la posición ganadora SHALL clasificarse solo por su pérdida, aunque pierda mucho. Al cambiar la regla, `CLASSIFIER_VERSION` SHALL subir a 3.
+
+#### Scenario: No aprovechar la ventaja
+- **WHEN** la mejor jugada (d5) daba EP 0.69 y el usuario juega Ab5, que deja EP 0.55 (pérdida 0.14)
 - **THEN** la jugada es Oportunidad perdida
 
-#### Scenario: Blunder tras blunder rival
-- **WHEN** en la misma situación el usuario juega una jugada que deja EP 0.40 (pérdida 0.45)
+#### Scenario: Ventaja que se conserva
+- **WHEN** la mejor jugada daba EP 0.90 y la jugada hecha deja EP 0.77 (pérdida 0.13)
+- **THEN** la jugada es Error, no Oportunidad perdida, porque la posición sigue ganadora
+
+#### Scenario: Sin ventaja ganadora
+- **WHEN** la mejor jugada daba EP 0.60 y la jugada hecha pierde 0.06
+- **THEN** la jugada es Imprecisión
+
+#### Scenario: Blunder que tira la ventaja
+- **WHEN** la mejor jugada daba EP 0.85 y la jugada hecha deja EP 0.40 (pérdida 0.45)
 - **THEN** la jugada sigue siendo Blunder
+
+#### Scenario: Partida de referencia
+- **WHEN** se clasifica CarlosAPV vs jyonGM53 (fixture de evaluaciones a profundidad 16)
+- **THEN** las blancas tienen exactamente 3 Oportunidades perdidas (8.Ab5, 11.Ag5 y 12.Da4), igual que chess.com
 
 ### Requirement: Precisión
 El sistema SHALL calcular la precisión de cada jugador con la fórmula por jugada de Lichess, `103.1668 · e^(−0.04354 · Δwin%) − 3.1669`, limitada a [0, 100] y promediada.
