@@ -50,11 +50,11 @@ El sistema SHALL aceptar links de partidas de:
 ### Requirement: Importar por usuario
 El sistema SHALL traer las N partidas más recientes (por defecto 20, máximo 100) de un usuario de Lichess o Chess.com desde el navegador, con peticiones en serie, y SHALL detectar el color del usuario en cada partida.
 
-Con sesión, si el usuario ya tiene partidas de Lichess o Chess.com con su color conocido, el formulario SHALL prellenar, por plataforma, el nombre con el que juega más veces; a igualdad, el de la partida más reciente. Mientras el usuario no haya elegido otra pestaña ni escrito nada, SHALL abrir la pestaña "Usuario" con la plataforma de la partida más reciente. Un nombre que el usuario ya editó no SHALL sobrescribirse.
+Con sesión, si el usuario ya tiene partidas de Lichess o Chess.com con su color conocido, el formulario SHALL prellenar, por plataforma, el nombre con el que juega más veces; a igualdad, el de la partida más reciente, y SHALL elegir la plataforma de la partida más reciente. El formulario SHALL abrir siempre en "Pegar PGN"; el prellenado solo se ve al entrar a "Usuario". Un nombre que el usuario ya editó no SHALL sobrescribirse.
 
 #### Scenario: Usuario prellenado
 - **WHEN** CarlosAPV, que ya importó partidas de chess.com como `CarlosAPV`, abre "Importar"
-- **THEN** ve la pestaña "Usuario" con Chess.com elegido y `CarlosAPV` escrito, y puede pulsar "Traer partidas" directamente
+- **THEN** el formulario abre en "Pegar PGN"; al entrar a "Usuario" ve Chess.com elegido y `CarlosAPV` escrito, y puede pulsar "Traer partidas" directamente
 
 #### Scenario: Cambiar de plataforma
 - **WHEN** el usuario también tiene partidas de Lichess como `carlos_lich` y cambia a Lichess sin haber editado el campo

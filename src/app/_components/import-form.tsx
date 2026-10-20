@@ -37,8 +37,7 @@ export function ImportForm() {
   const [platform, setPlatform] = useState<"lichess" | "chesscom">("lichess");
   const [user, setUser] = useState("");
   const [max, setMax] = useState(20);
-  // Prellenado (D9): solo mientras el usuario no eligió pestaña ni editó el nombre.
-  const [tabTouched, setTabTouched] = useState(false);
+  // Prellenado (D9): solo mientras el usuario no editó el nombre. La pestaña inicial siempre es "Pegar PGN".
   const [userEdited, setUserEdited] = useState(false);
 
   const [busy, setBusy] = useState(false);
@@ -50,12 +49,11 @@ export function ImportForm() {
   const acc = accounts.data;
 
   useEffect(() => {
-    if (!acc || tabTouched || userEdited || pgn || link) return;
+    if (!acc || userEdited) return;
     const recent = (["lichess", "chesscom"] as const)
       .filter((p) => acc[p])
       .sort((a, b) => new Date(acc[b]!.at).getTime() - new Date(acc[a]!.at).getTime())[0];
     if (!recent) return;
-    setTab("user");
     setPlatform(recent);
     setUser(acc[recent]!.name);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al llegar las cuentas
@@ -184,10 +182,7 @@ export function ImportForm() {
               role="tab"
               type="button"
               aria-selected={tab === t.id}
-              onClick={() => {
-                setTab(t.id);
-                setTabTouched(true);
-              }}
+              onClick={() => setTab(t.id)}
               className={`flex min-h-12 items-center justify-center gap-2 text-sm font-semibold transition ${
                 tab === t.id ? "bg-raised text-fg shadow-[inset_0_-2px_0_var(--color-brand)]" : "text-muted hover:text-fg"
               }`}
