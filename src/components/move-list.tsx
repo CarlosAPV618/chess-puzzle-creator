@@ -8,8 +8,9 @@ import { ClassIcon } from "./class-icon";
 /**
  * Lista de jugadas: fila desplazable en móvil, panel en dos columnas en escritorio.
  * `ply` = número de jugadas hechas (la jugada activa es ply-1).
- * `scrub`: franja donde deslizar va pasando las jugadas (la del centro es la activa); con un
- * hueco de media franja a cada lado para que la primera y la última también puedan quedar al centro.
+ * `scrub`: franja donde deslizar va pasando las jugadas (la del centro es la activa). Al inicio no hay
+ * hueco: el punto que marca la activa va de la primera jugada al centro al doble de velocidad. Al final,
+ * un hueco de media franja deja centrar la última.
  */
 export function MoveList({
   sans,
@@ -29,34 +30,50 @@ export function MoveList({
   onSelect: (ply: number) => void;
 }) {
   const ref = useRef<HTMLOListElement>(null);
-  // Destino del desplazamiento que hicimos nosotros: sus eventos de scroll no eligen jugada.
-  const target = useRef<number | null>(null);
+  // Desplazamiento nuestro en curso: su scroll no elige jugada hasta que el usuario toque la franja
+  // (el último evento puede llegar ya en el destino).
+  const auto = useRef(false);
   // Jugada elegida deslizando: ya está al centro, no se vuelve a centrar.
   const scrubbed = useRef<number | null>(null);
 
+  const center = (b: HTMLElement) => b.offsetLeft + b.offsetWidth / 2;
+  // Primera jugada y mitad de la franja: entre 0 y `edge` de scroll, el punto avanza al doble.
+  const geometry = (ol: HTMLOListElement) => {
+    const first = ol.querySelector<HTMLElement>("button[data-ply]");
+    const c0 = first ? center(first) : 0;
+    const half = ol.clientWidth / 2;
+    return { c0, half, edge: half - c0 };
+  };
+
   // Centra la jugada activa desplazando solo la lista: scrollIntoView movería también la ventana.
-  // En la franja solo cuenta `left` y en la rejilla de `lg` solo `top`; scrollTo recorta al rango válido.
+  // En la franja solo cuenta `left` y en la rejilla de `lg` solo `top`. Sin jugada activa (posición
+  // inicial), vuelve al principio.
   useEffect(() => {
     const fromScrub = scrubbed.current === ply;
     scrubbed.current = null;
     const ol = ref.current;
-    const el = ol?.querySelector<HTMLElement>("[data-active=true]");
-    if (fromScrub || !ol || !el) return;
-    const left = Math.max(0, Math.min(ol.scrollWidth - ol.clientWidth, el.offsetLeft - (ol.clientWidth - el.offsetWidth) / 2));
-    target.current = Math.abs(left - ol.scrollLeft) > 1 ? left : null;
-    ol.scrollTo({ left, top: el.offsetTop - (ol.clientHeight - el.offsetHeight) / 2, behavior: "smooth" });
+    if (fromScrub || !ol) return;
+    const el = ol.querySelector<HTMLElement>("[data-active=true]");
+    let left = 0;
+    if (el) {
+      const { c0, half, edge } = geometry(ol);
+      const c = center(el);
+      left = scrub && c < c0 + 2 * edge ? (c - c0) / 2 : c - half;
+      left = Math.max(0, Math.min(ol.scrollWidth - ol.clientWidth, left));
+    }
+    if (Math.abs(left - ol.scrollLeft) > 1) auto.current = true;
+    ol.scrollTo({ left, top: el ? el.offsetTop - (ol.clientHeight - el.offsetHeight) / 2 : 0, behavior: "smooth" });
   }, [ply]);
 
   function onScroll() {
     const ol = ref.current!;
-    if (target.current !== null) {
-      if (Math.abs(ol.scrollLeft - target.current) <= 1) target.current = null;
-      return;
-    }
-    const mid = ol.scrollLeft + ol.clientWidth / 2;
+    if (auto.current) return;
+    const { c0, half, edge } = geometry(ol);
+    const s = ol.scrollLeft;
+    const mid = s < edge ? c0 + 2 * s : s + half;
     let best: HTMLElement | null = null;
     for (const b of ol.querySelectorAll<HTMLElement>("button[data-ply]"))
-      if (!best || Math.abs(b.offsetLeft + b.offsetWidth / 2 - mid) < Math.abs(best.offsetLeft + best.offsetWidth / 2 - mid)) best = b;
+      if (!best || Math.abs(center(b) - mid) < Math.abs(center(best) - mid)) best = b;
     const p = Number(best?.dataset.ply);
     if (best && p !== ply) {
       scrubbed.current = p;
@@ -65,7 +82,7 @@ export function MoveList({
   }
 
   // El usuario toma el control: lo que siga desplazándose es suyo.
-  const takeOver = () => (target.current = null);
+  const takeOver = () => (auto.current = false);
 
   const offset = startsWithBlack ? 1 : 0;
   const spacer = scrub && <li aria-hidden className="w-1/2 shrink-0" />;
@@ -78,7 +95,6 @@ export function MoveList({
       onWheel={scrub ? takeOver : undefined}
       className="no-scrollbar relative flex gap-0.5 overflow-x-auto py-0.5 lg:grid lg:py-1 lg:max-h-80 lg:grid-cols-[2.5rem_1fr_1fr] lg:overflow-y-auto lg:overflow-x-visible"
     >
-      {spacer}
       {startsWithBlack && (
         <>
           <li className="shrink-0 self-center pl-2 font-mono text-xs text-muted lg:py-1">{startMoveNumber}.</li>
