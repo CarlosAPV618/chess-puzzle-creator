@@ -17,13 +17,8 @@ export function Logo({ className = "" }: { className?: string }) {
   return (
     <span className={`flex items-center gap-2 font-bold tracking-tight ${className}`}>
       <LogoMark />
-      <span className="flex items-center gap-1.5 text-[15px] leading-none sm:text-base">
-        <span>
-          Chess <span className="text-brand">Puzzle</span> Creator
-        </span>
-        <span className="rounded border border-brand/50 px-1 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider text-brand-strong">
-          Pro
-        </span>
+      <span className="text-[15px] leading-none sm:text-base">
+        Ajedrez<span className="text-brand">Lab</span>
       </span>
     </span>
   );

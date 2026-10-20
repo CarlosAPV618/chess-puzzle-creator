@@ -1,4 +1,4 @@
-# Chess Puzzle Creator Pro — logo
+# AjedrezLab — logo
 
 ## Concept
 A geometric knight (chess) whose straight back edge grows a jigsaw tab (puzzle):

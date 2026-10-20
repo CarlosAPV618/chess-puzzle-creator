@@ -1,4 +1,4 @@
-# Chess Puzzle Creator Pro
+# AjedrezLab
 
 Analiza tus partidas de ajedrez y practica **tus propios errores**. Importa desde PGN, un link de Lichess o Chess.com, o un usuario de esas plataformas. Stockfish corre en tu navegador, clasifica cada jugada al estilo chess.com (incluidas las **brillantes**) y convierte los blunders, las oportunidades perdidas y las brillantes de tus partidas, tuyas y de tus rivales, en ejercicios con repetición espaciada.
 

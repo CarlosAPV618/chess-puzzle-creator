@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <header className="sticky top-0 z-30 border-b border-line/60 bg-ink/90 backdrop-blur pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-3 sm:px-4">
-          <Link href="/" className="flex min-h-11 items-center" aria-label="Chess Puzzle Creator Pro, inicio">
+          <Link href="/" className="flex min-h-11 items-center" aria-label="AjedrezLab, inicio">
             <Logo />
           </Link>
           <nav aria-label="Principal" className="ml-4 hidden gap-1 md:flex">

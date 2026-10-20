@@ -7,14 +7,14 @@ import { AppShell } from "~/components/app-shell";
 import { TRPCReactProvider } from "~/trpc/react";
 
 export const metadata: Metadata = {
-  title: { default: "Chess Puzzle Creator Pro", template: "%s · Chess Puzzle Creator Pro" },
+  title: { default: "AjedrezLab", template: "%s · AjedrezLab" },
   description: "Analiza tus partidas y practica tus propios errores",
-  applicationName: "Chess Puzzle Creator Pro",
+  applicationName: "AjedrezLab",
   icons: {
     icon: [{ url: "/favicon.ico" }, { url: "/icons/icon.svg", type: "image/svg+xml" }],
     apple: "/icons/apple-touch-icon-v2.png",
   },
-  appleWebApp: { capable: true, title: "Chess Puzzle", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "AjedrezLab", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

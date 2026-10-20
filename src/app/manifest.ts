@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Chess Puzzle Creator Pro",
-    short_name: "Chess Puzzle Pro",
+    name: "AjedrezLab",
+    short_name: "AjedrezLab",
     description: "Analiza tus partidas y practica tus propios errores",
     lang: "es-MX",
     start_url: "/",
