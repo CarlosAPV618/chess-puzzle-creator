@@ -1,6 +1,6 @@
 ## 0. Preparación
 
-- [ ] 0.1 Archivar `refine-misses-and-practice` (`openspec archive refine-misses-and-practice`). Pasar sus tareas manuales pendientes (7.1–7.3, 8.3, 10.1) a la sección 9 de este change. Comprobar que `openspec validate practice-schedule-and-polish` pasa contra las specs ya archivadas.
+- [x] 0.1 Archivar `refine-misses-and-practice` (`openspec archive refine-misses-and-practice`). Pasar sus tareas manuales pendientes (7.1–7.3, 8.3, 10.1) a la sección 9 de este change. Comprobar que `openspec validate practice-schedule-and-polish` pasa contra las specs ya archivadas.
 
 ## 1. Validación de respuestas (D1)
 
@@ -123,7 +123,7 @@
   - "Practicar partida" abre la sesión.
   - Fuera de alcance por costo: tarjeta clicable de `/partidas`, carga por scroll y el barrido de desbordamiento a 360/390 px.
 - [x] 8.2 `pnpm typecheck`, `pnpm test`, `pnpm build` y `pnpm test:e2e`.
-- [ ] 8.3 `[POR VERIFICAR]` en Vercel → Settings → Environment Variables si `DATABASE_URL` de Preview es la de producción. Si lo es, no practicar en el preview antes del merge (D2, riesgos).
+- [x] 8.3 (No aplica: se desplegó directo a main sin preview, por decisión del usuario.) `[POR VERIFICAR]` en Vercel → Settings → Environment Variables si `DATABASE_URL` de Preview es la de producción. Si lo es, no practicar en el preview antes del merge (D2, riesgos).
 - [x] 8.4 Despliegue, en este orden (D2):
   1. escaneo de secretos y PR;
   2. respaldo en Neon (`create table exercises_box_backup_20261019 as select id, box, due_at from exercises`) y reparto de `box`;
