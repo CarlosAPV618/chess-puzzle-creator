@@ -39,7 +39,6 @@ html {
 }
 
 body {
-  min-height: 100dvh;
   background:
     radial-gradient(1200px 500px at 10% -10%, #1f3a2366, transparent 60%),
     var(--color-ink);

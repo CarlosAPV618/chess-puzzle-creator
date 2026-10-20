@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import postgres from "postgres";
 
 // Minimal mobile check at 360 px of what unit tests cannot see: hamburger instead of the bottom nav (D6),
-// one row under the board, ▶ never scrolls the page and "Practicar partida" opens the session (D7).
+// one row under the board, ▶ never scrolls the page and "Practicar" opens the session (D7).
 const PGN = `[Event "Live Chess"]
 [White "Maximiliano_Hernandez_Gutierrez"]
 [Black "Bartholomew_Featherstonehaugh99"]
@@ -63,10 +63,10 @@ test("mobile review and menu at 360 px", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
 
-  // (2) Repasar, Practicar partida and Girar on one row.
+  // (2) Repasar, Practicar and Girar on one row.
   const row = [
-    page.getByRole("button", { name: "Repasar partida" }),
-    page.getByRole("link", { name: "Practicar partida" }),
+    page.getByRole("button", { name: "Repasar" }),
+    page.getByRole("link", { name: "Practicar", exact: true }),
     page.getByRole("button", { name: "Girar tablero" }),
   ];
   const tops = await Promise.all(row.map((l) => l.evaluate((el) => (el as HTMLElement).offsetTop)));
@@ -78,7 +78,7 @@ test("mobile review and menu at 360 px", async ({ page }) => {
   await page.waitForTimeout(600); // smooth scroll of the strip
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
 
-  // (4) "Practicar partida" goes straight to the session.
+  // (4) "Practicar" goes straight to the session.
   await row[1]!.click();
   await expect(page.getByRole("progressbar", { name: "Progreso de la sesión" })).toBeVisible({ timeout: 30_000 }); // first compile of /practicar in next dev
 });

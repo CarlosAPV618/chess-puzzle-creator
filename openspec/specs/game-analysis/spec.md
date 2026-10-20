@@ -31,25 +31,24 @@ La pantalla de análisis SHALL mostrar:
 - el icono de clasificación sobre la casilla de destino y en la lista de jugadas;
 - la precisión de cada jugador y el conteo por clase.
 
-Al abrir una partida, el tablero SHALL estar en la posición inicial (ply 0).
+Al abrir una partida, el tablero SHALL estar en la primera jugada (ply 1); ◀ lleva a la posición inicial.
 
-**Encabezado de `/partidas/<id>`:** SHALL ser compacto (botón atrás de 36 px). Antes de los nombres SHALL mostrar el resultado:
-- con color de usuario: "Ganaste", "Perdiste" o "Tablas";
-- sin color: "Ganan blancas", "Ganan negras" o "Tablas";
-- sin etiqueta si la partida no terminó (`*`).
+**Encabezado de `/partidas/<id>`:** SHALL ser compacto: botón atrás de 36 px y, en celular, la franja de jugadas a su derecha. No SHALL repetir el resultado ni los nombres (ya están junto al tablero).
 
 **Gráfica de evaluación:**
 - SHALL marcar con un punto del color de su clase las Brillantes, Grandes jugadas, Imprecisiones, Errores, Oportunidades perdidas y Errores graves;
 - solo las del usuario cuando se conoce su color, y las de los dos bandos cuando no.
 - En pantallas táctiles SHALL responder solo a toques: un toque lleva a esa jugada y deslizar el dedo hace scroll de la página. Con mouse SHALL seguir permitiendo arrastrar.
 
-**Textos de una jugada** (veredicto, momento del repaso, "Encuentra una jugada mejor que…"): SHALL incluir el número de jugada y el bando: "12. b5" para blancas, "12… b5" para negras, y "(blancas)" o "(negras)" en el prompt de reintento.
+**Textos de una jugada** (veredicto, momento del repaso): SHALL incluir el número de jugada y el bando: "12. b5" para blancas, "12… b5" para negras.
 
-**Botones bajo el tablero:** "Repasar partida" (que durante el repaso pasa a "Salir del repaso"), "Practicar partida" (solo si la partida tiene ejercicios) y "Girar tablero", en ese orden.
+**Panel de reintento:** SHALL decir "Encuentra la mejor jugada" (o "Había una jugada brillante. Encuéntrala."), con el mismo padding que el veredicto y sus botones (Reintentar, Pista, Ver solución y "Volver" u "Omitir") en una sola fila.
+
+**Botones bajo el tablero:** "Repasar" (que durante el repaso pasa a "Salir del repaso"), "Practicar" (solo si la partida tiene ejercicios) y "Girar tablero", en ese orden.
 - SHALL estar en una sola fila desde 360 px, sin cortar el texto. Si no cabe, se ocultan antes los iconos de los botones de texto.
 - La barra ◀ ▶ SHALL ir fija abajo en pantallas menores a `lg`.
 
-**Lista de jugadas en celular:** una franja horizontal de unos 40 px de alto.
+**Lista de jugadas en celular:** una franja horizontal de unos 40 px de alto, arriba del tablero. La jugada activa SHALL quedar al centro. Deslizar la franja SHALL ir pasando las jugadas (la del centro pasa a ser la activa), al ritmo del dedo: rápido avanza rápido y lento avanza lento. En `lg` la lista va en el panel, en dos columnas.
 
 **Sin desplazamientos solos:** navegar con ◀ ▶, con la gráfica, con la lista, y el avance automático de "Repasar partida", no SHALL desplazar la página. Solo la lista de jugadas se desplaza dentro de su franja para mostrar la jugada activa. El veredicto de la jugada SHALL ocupar un alto fijo, también en la posición inicial.
 
@@ -63,11 +62,11 @@ SHALL funcionar desde 360 px de ancho sin scroll horizontal.
 
 #### Scenario: Abrir una partida
 - **WHEN** el usuario abre una partida analizada desde "Mis partidas"
-- **THEN** el tablero muestra la posición inicial y ▶ avanza a la primera jugada
+- **THEN** el tablero muestra la primera jugada, centrada en la franja, y ▶ avanza a la segunda
 
-#### Scenario: Encabezado con resultado
-- **WHEN** CarlosAPV, con blancas, abre una partida que terminó 1-0
-- **THEN** el encabezado dice "Ganaste" antes de "CarlosAPV vs JihadGhaziri"
+#### Scenario: Deslizar la franja de jugadas
+- **WHEN** en un celular el usuario arrastra la franja de jugadas hacia la izquierda
+- **THEN** el tablero avanza jugada por jugada mientras la franja se desplaza, y la jugada que queda al centro es la activa
 
 #### Scenario: Navegar jugadas en móvil
 - **WHEN** el usuario toca ▶ en la barra inferior o un punto de la gráfica
@@ -78,12 +77,12 @@ SHALL funcionar desde 360 px de ancho sin scroll horizontal.
 - **THEN** el tablero avanza cinco jugadas, la jugada activa queda visible en la franja de jugadas y la página no se desplaza
 
 #### Scenario: Repasar sin arrastrar la página
-- **WHEN** el usuario toca "Repasar partida" y el repaso avanza solo
+- **WHEN** el usuario toca "Repasar" y el repaso avanza solo
 - **THEN** la página no se desplaza
 
-#### Scenario: Prompt con número y bando
+#### Scenario: Panel de reintento
 - **WHEN** el usuario toca "Reintentar" en la jugada 12 de blancas, b5
-- **THEN** ve "Encuentra una jugada mejor que 12. b5 (blancas)"
+- **THEN** ve "Encuentra la mejor jugada" y, en la misma fila, "Pista", "Ver solución" y "Volver"
 
 #### Scenario: Gráfica del usuario
 - **WHEN** CarlosAPV, con blancas, abre una partida donde cometió 2 Imprecisiones y su rival 3 Errores
@@ -91,7 +90,7 @@ SHALL funcionar desde 360 px de ancho sin scroll horizontal.
 
 #### Scenario: Botones en una fila
 - **WHEN** el usuario abre una partida con ejercicios en 360 px
-- **THEN** "Repasar partida", "Practicar partida" y el botón de girar quedan en la misma fila, con el texto completo
+- **THEN** "Repasar", "Practicar" y el botón de girar quedan en la misma fila, con el texto completo
 
 #### Scenario: Scroll sobre la gráfica
 - **WHEN** en un celular el usuario desliza el dedo verticalmente empezando sobre la gráfica

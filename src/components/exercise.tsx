@@ -4,13 +4,13 @@ import { ArrowLeft, ExternalLink, Lightbulb, RotateCcw, Sparkles } from "lucide-
 import Link from "next/link";
 import { useState } from "react";
 import { Board } from "~/components/board";
-import { applyUci, formatEval, moveLabel, prettySan, sanOf, uciFrom, uciTo } from "~/components/chess";
-import { ClassIcon } from "~/components/class-icon";
+import { applyUci, prettySan, sanOf, uciFrom, uciTo } from "~/components/chess";
 import { EvalBar } from "~/components/eval-bar";
 import { NavBar } from "~/components/nav-bar";
+import { REVIEW_ROW_BTN } from "~/components/review";
 import { judgeMove } from "~/hooks/use-engine";
 import { MISS_WIN } from "~/lib/classify";
-import { CLASSIFICATIONS, type Classification, type Eval } from "~/lib/types";
+import type { Classification, Eval } from "~/lib/types";
 import type { RouterOutputs } from "~/trpc/react";
 
 export type Exercise = RouterOutputs["practice"]["queue"][number];
@@ -33,8 +33,6 @@ export function practiceFilters(params: URLSearchParams) {
   return { side, gameId, query: q.size ? `?${q}` : "" };
 }
 
-const asClass = (c: string): Classification => ((CLASSIFICATIONS as readonly string[]).includes(c) ? (c as Classification) : "blunder");
-
 /** Secuencia de jugadas desde `fen`; se corta en la primera ilegal. */
 function lineFrom(label: string, fen: string, ucis: string[]): Line {
   const fens = [fen];
@@ -51,17 +49,15 @@ function lineFrom(label: string, fen: string, ucis: string[]): Line {
 /**
  * Un ejercicio (D6). `onResult` se llama una sola vez, en cuanto el resultado queda fijado
  * (acierto o solución vista); `onNext` muestra "Siguiente" y `nextLink` un enlace en su lugar
- * (`/practicar/<id>`). `owner` decide si los textos dicen "Jugaste" o el nombre del jugador.
+ * (`/practicar/<id>`).
  */
 export function ExerciseView({
   ex,
-  owner,
   onResult,
   onNext,
   nextLink,
 }: {
   ex: Exercise;
-  owner: boolean;
   onResult?: (o: Outcome) => void;
   onNext?: () => void;
   nextLink?: { href: string; label: string };
@@ -83,7 +79,6 @@ export function ExerciseView({
   const goodCls: Classification = strict ? "brilliant" : "best";
   const orientation = ex.sideToMove === "b" ? "black" : "white";
   const bestSan = prettySan(sanOf(ex.fen, ex.bestUci));
-  const originCls: Classification = ex.kind === "brilliant" ? "brilliant" : asClass(ex.cls);
   // Última jugada del rival solo en errores y oportunidades perdidas (D6).
   const opponentLast = ex.kind !== "brilliant" && ex.lastMoveUci ? ex.lastMoveUci : null;
 
@@ -145,17 +140,6 @@ export function ExerciseView({
     setStep(0);
   }
 
-  // Quién hizo la jugada original: el dueño ve "jugaste"/"tu rival jugó"; los demás, el nombre (D5).
-  const mover = ex.sideToMove === "w" ? ex.white : ex.black;
-  const who = !owner
-    ? `${mover} jugó`
-    : ex.side === "me"
-      ? "jugaste"
-      : ex.side === "opponent"
-        ? "tu rival jugó"
-        : `${ex.sideToMove === "w" ? "blancas" : "negras"} jugaron`;
-  const originSan = ex.kind === "brilliant" ? `${moveLabel(ex.fen, sanOf(ex.fen, ex.bestUci))}!!` : moveLabel(ex.fen, sanOf(ex.fen, ex.playedUci));
-
   // Tablero: en una línea, el paso actual; si no, la jugada del usuario con el icono de SU resultado.
   const showFen = line ? line.fens[step]! : fen;
   const lastUci = line ? line.moves[step] || (step === 0 ? opponentLast : null) : (tried ?? opponentLast);
@@ -205,20 +189,6 @@ export function ExerciseView({
           <p className="mt-2 text-lg font-bold">{phase === "solve" || phase === "checking" ? prompt : msg}</p>
           {phase === "checking" && <p className="mt-1 text-sm text-muted">Comprobando…</p>}
 
-          {phase === "done" && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-raised p-2 text-sm">
-              <ClassIcon cls={originCls} size={22} className="shrink-0" />
-              <span className="min-w-0">
-                En la partida: {who} <b>{originSan}</b>
-                {ex.kind !== "brilliant" && ex.evalBefore && ex.evalAfter && (
-                  <span className="ml-1 font-mono text-muted">
-                    ({formatEval(ex.evalBefore)} → {formatEval(ex.evalAfter)})
-                  </span>
-                )}
-              </span>
-            </div>
-          )}
-
           {line ? (
             <div className="mt-3 grid grid-cols-1 gap-2">
               <p className="text-sm font-semibold text-brand">{line.label}</p>
@@ -228,7 +198,7 @@ export function ExerciseView({
               </button>
             </div>
           ) : (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className={`mt-4 flex gap-2 ${phase === "done" ? "flex-nowrap" : "flex-wrap"}`}>
               {phase === "wrong" && (
                 <button type="button" onClick={retry} className="btn-primary">
                   <RotateCcw className="size-4" /> Reintentar
@@ -248,22 +218,22 @@ export function ExerciseView({
               )}
               {phase === "done" && (
                 <>
-                  <button type="button" onClick={() => open(bestLine())} className="btn-secondary">
+                  <button type="button" onClick={() => open(bestLine())} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
                     Mejor línea
                   </button>
                   {onNext && (
-                    <button type="button" onClick={onNext} className="btn-primary">
+                    <button type="button" onClick={onNext} className={`btn-primary ${REVIEW_ROW_BTN}`}>
                       Siguiente
                     </button>
                   )}
                   {nextLink && (
-                    <Link href={nextLink.href} className="btn-primary">
+                    <Link href={nextLink.href} className={`btn-primary ${REVIEW_ROW_BTN}`}>
                       {nextLink.label}
                     </Link>
                   )}
                   {ex.gameId && (
-                    <Link href={`/partidas/${ex.gameId}`} className="btn-ghost">
-                      <ExternalLink className="size-4" /> Ver en la partida
+                    <Link href={`/partidas/${ex.gameId}`} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                      <ExternalLink className="hidden size-4 sm:block" /> Ver partida
                     </Link>
                   )}
                 </>

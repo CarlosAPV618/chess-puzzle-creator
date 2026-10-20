@@ -9,7 +9,7 @@ import { CLASSIFIER_VERSION } from "~/lib/classify/version";
 import { netError } from "~/components/pwa";
 import { GameReview, REVIEW_ROW_BTN } from "~/components/review";
 import { useAnalysis } from "~/hooks/use-analysis";
-import type { Color, GameAnalysis } from "~/lib/types";
+import type { GameAnalysis } from "~/lib/types";
 import { api } from "~/trpc/react";
 
 export default function SavedGamePage() {
@@ -59,70 +59,47 @@ export default function SavedGamePage() {
     );
 
   return (
-    <>
-      <div className="mb-1.5 flex items-center gap-1.5">
+    <GameReview
+      game={game}
+      analysis={analysis}
+      back={
         <Link href="/partidas" className="btn-ghost -ml-2 size-9 min-h-9 shrink-0 px-0" aria-label="Volver a Mis partidas">
           <ChevronLeft className="size-5" />
         </Link>
-        <ResultTag result={game.result} userColor={game.userColor} />
-        <h1 className="min-w-0 truncate text-sm font-bold">
-          {game.white} vs {game.black}
-          {game.openingName && <span className="ml-2 text-sm font-normal text-muted">{game.openingName}</span>}
-        </h1>
-      </div>
-      <GameReview
-        game={game}
-        analysis={analysis}
-        liveEvals={state.status === "running" ? liveEvals : undefined}
-        actions={
-          q.data?.exerciseCount ? (
-            <Link href={`/practicar?partida=${id}&iniciar=1`} className={`btn-primary ${REVIEW_ROW_BTN}`}>
-              <Puzzle className="hidden size-4 sm:block" /> Practicar partida
-            </Link>
-          ) : null
-        }
-        toolbar={
-          <>
-            {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
-              <p className="w-full rounded-lg bg-raised p-3 text-sm" role="status">
-                La clasificación mejoró desde que analizaste esta partida. Usa <strong>Reanalizar</strong> para actualizarla.
-              </p>
-            )}
-            <AnalysisControls state={state} hasAnalysis={!!analysis} onStart={(d) => void analyze(d)} onCancel={cancel} />
-            {save.isPending && (
-              <p className="flex w-full items-center gap-2 text-sm text-muted">
-                <Loader2 className="size-4 animate-spin" /> Guardando…
-              </p>
-            )}
-            {note && (
-              <p className="flex w-full flex-wrap items-center gap-2 text-sm" role="status">
-                {note}
-                {lastRun && (
-                  <button type="button" className="btn-secondary" onClick={() => void persist(lastRun)}>
-                    Reintentar guardado
-                  </button>
-                )}
-              </p>
-            )}
-          </>
-        }
-      />
-    </>
+      }
+      liveEvals={state.status === "running" ? liveEvals : undefined}
+      actions={
+        q.data?.exerciseCount ? (
+          <Link href={`/practicar?partida=${id}&iniciar=1`} className={`btn-primary ${REVIEW_ROW_BTN}`}>
+            <Puzzle className="size-4" /> Practicar
+          </Link>
+        ) : null
+      }
+      toolbar={
+        <>
+          {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
+            <p className="w-full rounded-lg bg-raised p-3 text-sm" role="status">
+              La clasificación mejoró desde que analizaste esta partida. Usa <strong>Reanalizar</strong> para actualizarla.
+            </p>
+          )}
+          <AnalysisControls state={state} hasAnalysis={!!analysis} onStart={(d) => void analyze(d)} onCancel={cancel} />
+          {save.isPending && (
+            <p className="flex w-full items-center gap-2 text-sm text-muted">
+              <Loader2 className="size-4 animate-spin" /> Guardando…
+            </p>
+          )}
+          {note && (
+            <p className="flex w-full flex-wrap items-center gap-2 text-sm" role="status">
+              {note}
+              {lastRun && (
+                <button type="button" className="btn-secondary" onClick={() => void persist(lastRun)}>
+                  Reintentar guardado
+                </button>
+              )}
+            </p>
+          )}
+        </>
+      }
+    />
   );
-}
-
-/** "Ganaste/Perdiste/Tablas" con color conocido, "Ganan blancas/negras/Tablas" sin él; nada con "*" (D7). */
-function ResultTag({ result, userColor }: { result?: string | null; userColor: Color | null }) {
-  const winner: Color | "draw" | null =
-    result === "1-0" ? "w" : result === "0-1" ? "b" : result === "1/2-1/2" ? "draw" : null;
-  if (!winner) return null;
-  const [text, tone] =
-    winner === "draw"
-      ? ["Tablas", "bg-raised text-muted"]
-      : !userColor
-        ? [winner === "w" ? "Ganan blancas" : "Ganan negras", "bg-raised text-fg"]
-        : winner === userColor
-          ? ["Ganaste", "bg-c-best/20 text-c-best"]
-          : ["Perdiste", "bg-c-blunder/20 text-c-blunder"];
-  return <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${tone}`}>{text}</span>;
 }

@@ -134,25 +134,16 @@ La misma regla SHALL aplicarse en "Reintentar" y en "Repasar partida", con la ju
 - **THEN** se marca incorrecta y se ofrecen "Reintentar", "Pista" y "Ver solución"
 
 ### Requirement: Explicar el error
-Después de cada respuesta, el sistema SHALL mostrar:
-- la jugada original con su número y su icono;
-- quién la jugó;
-- la evaluación antes y después.
-
-Para el dueño dice "Jugaste" o "Tu rival jugó"; para cualquier otra persona, el nombre del jugador ("CarlosAPV jugó 11. exd5").
-
-SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en este orden: "Mejor línea", "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente) y "Ver en la partida" (solo el dueño). No SHALL haber "Lo que podía pasar".
+Después de cada respuesta, el sistema SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en una sola fila y en este orden: "Mejor línea", "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente) y "Ver partida" (solo el dueño). No SHALL haber "Lo que podía pasar" ni un recuadro con la jugada original de la partida.
 
 Tras la respuesta, el tablero SHALL quedarse en la jugada del usuario con el icono de su resultado:
 - si es correcta, el icono de Mejor (o de Brillante en `brilliant`);
 - si es incorrecta, el de su clasificación.
 
-La jugada original de la partida SHALL mostrarse solo en el panel ("En la partida: 11. exd5" con su icono). Así el icono del tablero nunca contradice el veredicto.
-
 #### Scenario: Correcto sin contradicción
 - **WHEN** el usuario acierta un ejercicio `miss` cuya jugada original fue 11. exd5
 - **THEN** el tablero muestra su jugada con el icono de Mejor junto a "¡Correcto!"
-- **AND** el panel dice "En la partida: jugaste 11. exd5" con el icono de Oportunidad perdida
+- **AND** "Mejor línea", "Siguiente" y "Ver partida" quedan en la misma fila
 
 #### Scenario: Mejor línea a mano
 - **WHEN** el usuario resuelve un ejercicio y toca "Mejor línea"

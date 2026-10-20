@@ -7,7 +7,7 @@ import type { Color, Eval, GameAnalysis } from "~/lib/types";
 import { acceptedMoves, getEngine, judgeMove } from "~/hooks/use-engine";
 import { MISS_WIN } from "~/lib/classify";
 import { Board } from "./board";
-import { applyUci, formatEval, moveLabel, prettySan, replay, sanOf, sideName, turnOf, uciFrom, uciTo } from "./chess";
+import { applyUci, formatEval, moveLabel, prettySan, replay, sanOf, turnOf, uciFrom, uciTo } from "./chess";
 import { CLASS_META, ClassIcon, RETRY_CLASSES } from "./class-icon";
 import { EvalBar } from "./eval-bar";
 import { EvalGraph } from "./eval-graph";
@@ -68,6 +68,7 @@ export function GameReview({
   liveEvals,
   toolbar,
   actions,
+  back,
 }: {
   game: ReviewGame;
   analysis: GameAnalysis | null;
@@ -77,13 +78,16 @@ export function GameReview({
   toolbar?: ReactNode;
   /** Botones extra de la fila bajo el tablero, entre Repasar y Girar (p. ej. "Practicar partida"); usan `REVIEW_ROW_BTN`. */
   actions?: ReactNode;
+  /** Botón de volver, a la izquierda de la franja de jugadas. */
+  back?: ReactNode;
 }) {
   const { fens, sans } = useMemo(() => replay(game.startFen, game.movesUci), [game.startFen, game.movesUci]);
   const N = game.movesUci.length;
   const firstColor = turnOf(game.startFen);
   const colorOf = useCallback((move: number): Color => ((move % 2 === 0) === (firstColor === "w") ? "w" : "b"), [firstColor]);
 
-  const [ply, setPly] = useState(0);
+  // Arranca en la primera jugada: así la franja de jugadas ya tiene una activa que deslizar.
+  const [ply, setPly] = useState(N > 0 ? 1 : 0);
   const [flipped, setFlipped] = useState(false);
   const [variant, setVariant] = useState<{ base: number; moves: string[] } | null>(null);
   const [variantInfo, setVariantInfo] = useState<{ eval?: Eval; best?: string }>({});
@@ -304,174 +308,191 @@ export function GameReview({
     />
   );
 
-  return (
-    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 pb-[calc(3rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:pb-0">
-      {/* Columna del tablero */}
-      <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-15rem))]">
-        {player(topIsWhite)}
-        <div ref={boardRef} className="flex gap-1.5">
-          <EvalBar value={shownEval} fen={fen} orientation={orientation} />
-          <div className="min-w-0 flex-1">
-            <Board
-              id="review"
-              fen={fen}
-              orientation={orientation}
-              onMove={canMove ? onMove : undefined}
-              arrows={arrows}
-              lastMove={lastMove}
-              badge={badge}
-              highlight={trial?.hint && pos?.best ? [uciFrom(pos.best.uci)] : []}
-            />
-          </div>
-        </div>
-        {player(!topIsWhite)}
-        {/* Una sola fila desde 360 px (D7): Repasar/Salir → actions → Girar. */}
-        <div className="flex flex-nowrap gap-1.5">
-          {analysis &&
-            (review && !review.finished ? (
-              <button type="button" onClick={exitReview} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
-                <X className="hidden size-4 sm:block" /> Salir del repaso
-              </button>
-            ) : (
-              !review && (
-                <button type="button" onClick={() => startReview(reviewSide)} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
-                  <GraduationCap className="hidden size-4 sm:block" /> Repasar partida
-                </button>
-              )
-            ))}
-          {actions}
-          <button
-            type="button"
-            aria-label="Girar tablero"
-            title="Girar tablero"
-            onClick={() => setFlipped(!flipped)}
-            className="btn-secondary size-11 shrink-0 px-0"
-          >
-            <RefreshCw className="size-4" />
-          </button>
-        </div>
-      </div>
+  const moveList = (scrub?: boolean) => (
+    <MoveList
+      sans={sans}
+      classes={classes}
+      ply={ply}
+      startsWithBlack={firstColor === "b"}
+      startMoveNumber={Number(game.startFen.split(" ")[5] ?? 1)}
+      scrub={scrub}
+      onSelect={goto}
+    />
+  );
 
-      {/* Panel */}
-      <div className="flex min-w-0 flex-col gap-3">
-        {/* Sin análisis, los controles (profundidad + Analizar) van primero para que se vean sin bajar. */}
-        {!analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
-        {trial ? (
-          <TrialPanel
-            trial={trial}
-            review={!!review}
-            prompt={
-              missedBrilliant
-                ? "Había una jugada brillante. Encuéntrala."
-                : `Encuentra una jugada mejor que ${moveLabel(fens[trial.move]!, sans[trial.move] ?? "")} (${sideName(fens[trial.move]!)})`
-            }
-            onRetry={() => setTrial({ ...trial, tried: null, status: "idle", msg: undefined })}
-            onHint={() => setTrial({ ...trial, hint: true })}
-            onSolution={() =>
-              setTrial({
-                ...trial,
-                tried: null,
-                status: "solution",
-                msg: pos?.best ? `La mejor era ${prettySan(sanOf(fens[trial.move]!, pos.best.uci))}` : undefined,
-              })
-            }
-            onSkip={() => setTrial({ ...trial, status: "skipped" })}
-            onDone={finishTrial}
-          />
-        ) : review?.finished ? (
-          <div className="rounded-lg bg-panel p-4 text-center">
-            {review.moments.length === 0 ? (
-              <>
-                <p className="text-lg font-bold">
-                  Sin jugadas que repasar de {review.side === "w" ? game.white : game.black}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => startReview(review.side === "w" ? "b" : "w")}
-                  className="btn-primary mt-3 w-full"
-                >
-                  Repasar las de {review.side === "w" ? game.black : game.white}
+  return (
+    <>
+      {/* Celular: atrás + franja de jugadas. En `lg` la lista va en el panel. */}
+      <div className={`mb-1.5 flex items-center gap-1.5 ${back ? "" : "lg:hidden"}`}>
+        {back}
+        <div className="min-w-0 flex-1 rounded-lg bg-panel px-1 lg:hidden">{moveList(true)}</div>
+      </div>
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 pb-[calc(3rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:pb-0">
+        {/* Columna del tablero */}
+        <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-15rem))]">
+          {player(topIsWhite)}
+          <div ref={boardRef} className="flex gap-1.5">
+            <EvalBar value={shownEval} fen={fen} orientation={orientation} />
+            <div className="min-w-0 flex-1">
+              <Board
+                id="review"
+                fen={fen}
+                orientation={orientation}
+                onMove={canMove ? onMove : undefined}
+                arrows={arrows}
+                lastMove={lastMove}
+                badge={badge}
+                highlight={trial?.hint && pos?.best ? [uciFrom(pos.best.uci)] : []}
+              />
+            </div>
+          </div>
+          {player(!topIsWhite)}
+          {/* Una sola fila desde 360 px (D7): Repasar/Salir → actions → Girar. */}
+          <div className="flex flex-nowrap gap-1.5">
+            {analysis &&
+              (review && !review.finished ? (
+                <button type="button" onClick={exitReview} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                  <X className="hidden size-4 sm:block" /> Salir del repaso
                 </button>
-              </>
-            ) : (
-              <p className="text-lg font-bold">
-                Acertaste {Object.values(review.results).filter((r) => r === true).length} de {review.moments.length}
-              </p>
-            )}
+              ) : (
+                !review && (
+                  <button type="button" onClick={() => startReview(reviewSide)} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                    <GraduationCap className="size-4" /> Repasar
+                  </button>
+                )
+              ))}
+            {actions}
             <button
               type="button"
-              onClick={() => setReview(null)}
-              className={`${review.moments.length === 0 ? "btn-secondary" : "btn-primary"} mt-2 w-full`}
+              aria-label="Girar tablero"
+              title="Girar tablero"
+              onClick={() => setFlipped(!flipped)}
+              className="btn-secondary size-11 shrink-0 px-0"
             >
-              Terminar repaso
+              <RefreshCw className="size-4" />
             </button>
           </div>
-        ) : review && review.pending !== null ? (
-          <PendingPanel
-            label={moveLabel(fens[review.pending]!, sans[review.pending]!)}
-            cls={analysis?.moves[review.pending]?.class ?? "mistake"}
-            who={review.side === game.userColor ? "Tu jugada" : `Jugada de ${review.side === "w" ? game.white : game.black}`}
-            brilliant={!!analysis?.moves[review.pending]?.brilliantMissed}
-            onReview={() => {
-              const m = review.pending!;
-              setReview({ ...review, pending: null });
-              startTrial(m);
-            }}
-            onContinue={() => setReview({ ...review, pending: null, results: { ...review.results, [review.pending!]: null } })}
-          />
-        ) : inVariant ? (
-          <div className="flex items-center justify-between gap-2 rounded-lg bg-panel p-3">
-            <span className="text-sm text-muted">
-              Variante · <span className="font-mono text-fg">{formatEval(variantInfo.eval, fen)}</span>
-            </span>
-            <button type="button" onClick={() => setVariant(null)} className="btn-secondary">
-              <Undo2 className="size-4" /> Volver a la partida
-            </button>
-          </div>
-        ) : prevAnalysis ? (
-          <MoveVerdict
-            label={moveLabel(fens[prevMove]!, sans[prevMove]!)}
-            cls={prevAnalysis.class}
-            bestSan={!reviewing && prevBest && prevBest.uci !== game.movesUci[prevMove] ? sanOf(fens[prevMove]!, prevBest.uci) : null}
-            evalText={formatEval(evals[ply], fen)}
-            onRetry={RETRY_CLASSES.includes(prevAnalysis.class) && !review ? () => startTrial(prevMove) : undefined}
-          />
-        ) : (
-          // Mismo hueco en el ply 0 para que la gráfica no salte al pasar a la jugada 1.
-          analysis &&
-          ply === 0 && (
-            <div className={VERDICT_BOX}>
-              <p className="truncate font-semibold text-muted">Posición inicial</p>
-            </div>
-          )
-        )}
-
-        {review?.paused && !review.finished && !trial && (
-          <div className="flex items-center justify-between gap-2 rounded-xl bg-brand/10 p-3 ring-2 ring-brand/70">
-            <span className="text-sm font-semibold">Repaso en pausa</span>
-            <button type="button" onClick={() => setReview({ ...review, paused: false })} className="btn-primary">
-              <Play className="size-4" /> Continuar repaso
-            </button>
-          </div>
-        )}
-
-        {(analysis ?? liveEvals?.length) ? <EvalGraph evals={evals} fens={fens} classes={classes} ply={ply} markColor={game.userColor} onSelect={goto} /> : null}
-
-        <div className="rounded-lg bg-panel px-1 lg:p-2">
-          <MoveList sans={sans} classes={classes} ply={ply} startsWithBlack={firstColor === "b"} startMoveNumber={Number(game.startFen.split(" ")[5] ?? 1)} onSelect={goto} />
         </div>
 
-        {analysis && (
-          <Summary analysis={analysis} white={game.white} black={game.black} firstColor={firstColor} />
-        )}
+        {/* Panel */}
+        <div className="flex min-w-0 flex-col gap-3">
+          {/* Sin análisis, los controles (profundidad + Analizar) van primero para que se vean sin bajar. */}
+          {!analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
+          {trial ? (
+            <TrialPanel
+              trial={trial}
+              review={!!review}
+              prompt={
+                missedBrilliant
+                  ? "Había una jugada brillante. Encuéntrala."
+                  : "Encuentra la mejor jugada"
+              }
+              onRetry={() => setTrial({ ...trial, tried: null, status: "idle", msg: undefined })}
+              onHint={() => setTrial({ ...trial, hint: true })}
+              onSolution={() =>
+                setTrial({
+                  ...trial,
+                  tried: null,
+                  status: "solution",
+                  msg: pos?.best ? `La mejor era ${prettySan(sanOf(fens[trial.move]!, pos.best.uci))}` : undefined,
+                })
+              }
+              onSkip={() => setTrial({ ...trial, status: "skipped" })}
+              onDone={finishTrial}
+            />
+          ) : review?.finished ? (
+            <div className="rounded-lg bg-panel p-4 text-center">
+              {review.moments.length === 0 ? (
+                <>
+                  <p className="text-lg font-bold">
+                    Sin jugadas que repasar de {review.side === "w" ? game.white : game.black}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => startReview(review.side === "w" ? "b" : "w")}
+                    className="btn-primary mt-3 w-full"
+                  >
+                    Repasar las de {review.side === "w" ? game.black : game.white}
+                  </button>
+                </>
+              ) : (
+                <p className="text-lg font-bold">
+                  Acertaste {Object.values(review.results).filter((r) => r === true).length} de {review.moments.length}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setReview(null)}
+                className={`${review.moments.length === 0 ? "btn-secondary" : "btn-primary"} mt-2 w-full`}
+              >
+                Terminar repaso
+              </button>
+            </div>
+          ) : review && review.pending !== null ? (
+            <PendingPanel
+              label={moveLabel(fens[review.pending]!, sans[review.pending]!)}
+              cls={analysis?.moves[review.pending]?.class ?? "mistake"}
+              who={review.side === game.userColor ? "Tu jugada" : `Jugada de ${review.side === "w" ? game.white : game.black}`}
+              brilliant={!!analysis?.moves[review.pending]?.brilliantMissed}
+              onReview={() => {
+                const m = review.pending!;
+                setReview({ ...review, pending: null });
+                startTrial(m);
+              }}
+              onContinue={() => setReview({ ...review, pending: null, results: { ...review.results, [review.pending!]: null } })}
+            />
+          ) : inVariant ? (
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-panel p-3">
+              <span className="text-sm text-muted">
+                Variante · <span className="font-mono text-fg">{formatEval(variantInfo.eval, fen)}</span>
+              </span>
+              <button type="button" onClick={() => setVariant(null)} className="btn-secondary">
+                <Undo2 className="size-4" /> Volver a la partida
+              </button>
+            </div>
+          ) : prevAnalysis ? (
+            <MoveVerdict
+              label={moveLabel(fens[prevMove]!, sans[prevMove]!)}
+              cls={prevAnalysis.class}
+              bestSan={!reviewing && prevBest && prevBest.uci !== game.movesUci[prevMove] ? sanOf(fens[prevMove]!, prevBest.uci) : null}
+              evalText={formatEval(evals[ply], fen)}
+              onRetry={RETRY_CLASSES.includes(prevAnalysis.class) && !review ? () => startTrial(prevMove) : undefined}
+            />
+          ) : (
+            // Mismo hueco en el ply 0 para que la gráfica no salte al pasar a la jugada 1.
+            analysis &&
+            ply === 0 && (
+              <div className={VERDICT_BOX}>
+                <p className="truncate font-semibold text-muted">Posición inicial</p>
+              </div>
+            )
+          )}
 
-        {analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
+          {review?.paused && !review.finished && !trial && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-brand/10 p-3 ring-2 ring-brand/70">
+              <span className="text-sm font-semibold">Repaso en pausa</span>
+              <button type="button" onClick={() => setReview({ ...review, paused: false })} className="btn-primary">
+                <Play className="size-4" /> Continuar repaso
+              </button>
+            </div>
+          )}
 
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-ink/95 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
-          <NavBar ply={ply} max={N} onChange={goto} />
+          {(analysis ?? liveEvals?.length) ? <EvalGraph evals={evals} fens={fens} classes={classes} ply={ply} markColor={game.userColor} onSelect={goto} /> : null}
+
+          <div className="hidden rounded-lg bg-panel p-2 lg:block">{moveList()}</div>
+
+          {analysis && (
+            <Summary analysis={analysis} white={game.white} black={game.black} firstColor={firstColor} />
+          )}
+
+          {analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
+
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-ink/95 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
+            <NavBar ply={ply} max={N} onChange={goto} />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -553,44 +574,46 @@ function TrialPanel({
   const s = trial.status;
   const tone =
     s === "correct" ? "bg-c-best/15 ring-c-best" : s === "wrong" ? "bg-c-blunder/15 ring-c-blunder" : "bg-brand/10 ring-brand";
+  // Mismo padding que el veredicto y los botones en una fila, para que el panel no crezca mucho más.
+  const btn = `${REVIEW_ROW_BTN} min-h-9`;
   return (
-    <div className={`rounded-xl p-4 ring-2 ${tone}`} aria-live="polite">
-      <p className="flex items-center gap-2 text-lg font-bold">
+    <div className={`rounded-lg px-3 py-2.5 ring-2 ${tone}`} aria-live="polite">
+      <p className="flex items-center gap-2 font-semibold">
         {(s === "idle" || s === "checking") && <Target className="size-5 shrink-0 text-brand" />}
-        {s === "idle" || s === "checking" ? prompt : (trial.msg ?? "Omitida")}
+        <span className="min-w-0 truncate">{s === "idle" || s === "checking" ? prompt : (trial.msg ?? "Omitida")}</span>
+        {s === "checking" && <span className="shrink-0 text-sm font-normal text-muted">Comprobando…</span>}
       </p>
-      {s === "checking" && <p className="mt-1 text-sm text-muted">Comprobando…</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-nowrap gap-1.5">
         {s === "wrong" && (
-          <button type="button" onClick={onRetry} className="btn-primary">
-            <RotateCcw className="size-4" /> Reintentar
+          <button type="button" onClick={onRetry} className={`btn-primary ${btn}`}>
+            <RotateCcw className="hidden size-4 sm:block" /> Reintentar
           </button>
         )}
         {(s === "idle" || s === "wrong") && (
           <>
             {!trial.hint && (
-              <button type="button" onClick={onHint} className="btn-secondary">
-                <Lightbulb className="size-4" /> Pista
+              <button type="button" onClick={onHint} className={`btn-secondary ${btn}`}>
+                <Lightbulb className="hidden size-4 sm:block" /> Pista
               </button>
             )}
-            <button type="button" onClick={onSolution} className="btn-secondary">
+            <button type="button" onClick={onSolution} className={`btn-secondary ${btn}`}>
               Ver solución
             </button>
             {review && (
-              <button type="button" onClick={onSkip} className="btn-secondary">
+              <button type="button" onClick={onSkip} className={`btn-secondary ${btn}`}>
                 Omitir
               </button>
             )}
           </>
         )}
         {(s === "correct" || s === "solution" || s === "skipped") && (
-          <button type="button" onClick={() => onDone(s === "correct")} className="btn-primary">
-            {review ? "Continuar" : "Volver a la partida"}
+          <button type="button" onClick={() => onDone(s === "correct")} className={`btn-primary ${btn}`}>
+            {review ? "Continuar" : "Volver"}
           </button>
         )}
         {!review && s !== "correct" && s !== "solution" && (
-          <button type="button" onClick={() => onDone(false)} className="btn-ghost">
-            Volver a la partida
+          <button type="button" onClick={() => onDone(false)} className={`btn-secondary ${btn}`}>
+            Volver
           </button>
         )}
       </div>

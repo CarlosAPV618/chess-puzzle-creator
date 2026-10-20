@@ -13,6 +13,9 @@ const NOT_FOUND = "No encontramos ese ejercicio";
 
 export default function ExercisePage() {
   const { id } = useParams<{ id: string }>();
+  // Next no sube si el inicio de la página ya asoma (p. ej. tras bajar un poco para tocar "Siguiente"),
+  // y el encabezado fijo tapa la fila de Practicar/Compartir.
+  useEffect(() => window.scrollTo(0, 0), [id]);
   // Con `key`, "Siguiente" empieza con el menú y la imagen limpios.
   return (
     <Suspense>
@@ -150,7 +153,6 @@ function ExerciseById({ id }: { id: string }) {
       <ExerciseView
         key={exercise.id}
         ex={exercise}
-        owner={owner}
         onResult={owner ? (o) => submit.mutate({ exerciseId: exercise.id, ...o }) : undefined}
         nextLink={
           owner && !next.isLoading

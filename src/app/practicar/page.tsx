@@ -275,7 +275,7 @@ function Session({ list, onExit }: { list: Exercise[]; onExit: () => void }) {
         </span>
       </div>
       {saveError && <p className="mb-2 text-sm text-[#ffb4a8]">{saveError}</p>}
-      <ExerciseView key={ex.id} ex={ex} owner onResult={result} onNext={() => setI(i + 1)} />
+      <ExerciseView key={ex.id} ex={ex} onResult={result} onNext={() => setI(i + 1)} />
     </div>
   );
 }

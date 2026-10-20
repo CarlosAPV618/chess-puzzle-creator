@@ -68,8 +68,6 @@ const PIECE_GLYPH: Record<string, string> = { K: "♔", Q: "♕", R: "♖", B: "
 /** "Nf3" → "♘f3" para mostrar. */
 export const prettySan = (san: string) => san.replace(/^[KQRBN]/, (p) => PIECE_GLYPH[p] ?? p);
 
-export const sideName = (fen: string): "blancas" | "negras" => (turnOf(fen) === "w" ? "blancas" : "negras");
-
 /** "12. ♘f3" (blancas) o "12… b5" (negras): número del campo 6 del FEN, turno del campo 2. */
 export function moveLabel(fenBefore: string, san: string) {
   const n = fenBefore.split(" ")[5] ?? "1";
