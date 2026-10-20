@@ -47,6 +47,10 @@ SHALL funcionar desde 360 px de ancho sin scroll horizontal.
 - **WHEN** CarlosAPV, con blancas, abre una partida que terminó 1-0
 - **THEN** el encabezado dice "Ganaste" antes de "CarlosAPV vs JihadGhaziri"
 
+#### Scenario: Navegar jugadas en móvil
+- **WHEN** el usuario toca ▶ en la barra inferior o un punto de la gráfica
+- **THEN** el tablero va a esa jugada, la barra de evaluación se actualiza y la jugada queda resaltada y visible en la lista
+
 #### Scenario: Navegar sin que la página se mueva
 - **WHEN** en un celular de 360 px el usuario está viendo el tablero y toca ▶ cinco veces
 - **THEN** el tablero avanza cinco jugadas, la jugada activa queda visible en la franja de jugadas y la página no se desplaza

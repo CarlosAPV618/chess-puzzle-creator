@@ -64,7 +64,7 @@
   - Al abrir el menú se genera el PNG. "Imagen" queda deshabilitada con spinner hasta que esté listo.
   - Imagen: con `(pointer: coarse)` y `navigator.canShare({ files })` → `navigator.share({ files })`; si no, o con `NotAllowedError`, descarga `ejercicio.png`. `AbortError` se ignora.
   - "Enlace" se queda como hoy.
-- [ ] 4.3 `[POR VERIFICAR]` a mano:
+- [x] 4.3 `[POR VERIFICAR]` a mano:
   - el PNG no lleva nombres ni otros textos;
   - Android Chrome y iOS Safari abren la hoja nativa con la imagen (activación de usuario, D5);
   - Firefox y Chrome de escritorio descargan un PNG con las piezas dibujadas.
@@ -137,7 +137,7 @@
   - menú hamburguesa en el celular.
 
   Rollback: revertir el deploy y restaurar `box`/`due_at` desde el respaldo.
-- [ ] 8.6 Borrar la tabla de respaldo cuando el usuario confirme que todo está bien.
+- [x] 8.6 Borrar la tabla de respaldo cuando el usuario confirme que todo está bien.
 
 ## 9. Pendientes heredados de `refine-misses-and-practice`
 

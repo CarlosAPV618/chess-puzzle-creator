@@ -63,9 +63,17 @@ La posición (`fen`) y la fase SHALL calcularse en el servidor a partir del PGN.
 - **THEN** su ejercicio se archiva y deja de aparecer en la cola, pero su historial se conserva
 
 ### Requirement: Sesión de práctica
-La sesión SHALL tomar hasta 10 ejercicios no archivados ni dominados: primero los ya intentados con `due_at ≤ ahora`, empezando por los más atrasados; después los nuevos (sin intentos), empezando por los de las partidas más recientes. Un ejercicio fallado SHALL repetirse una vez al final de la sesión en curso.
+"Empezar" SHALL armar una sesión de hasta 10 ejercicios no archivados y no dominados (`box < 3`) que cumplan una de dos condiciones:
+- son nuevos o fallados (`box = 0`);
+- son repasos vencidos (`due_at ≤ ahora`).
+
+El orden SHALL ser aleatorio dentro de cada grupo: primero los nuevos y fallados, después los repasos vencidos. Dos sesiones seguidas con los mismos ejercicios disponibles no SHALL dar siempre el mismo orden.
+
+Un ejercicio fallado no SHALL repetirse dentro de la misma sesión. Vuelve en la siguiente porque queda con `box = 0`.
 
 La sesión SHALL incluir los tres tipos. Solo SHALL poder filtrarse por "De quién" (todas, mías, de rivales) y por partida; no SHALL haber filtros de tipo, clase ni fase. El botón "Empezar" SHALL estar justo debajo de los filtros.
+
+"Practicar partida", desde la partida, SHALL abrir directamente una sesión con todos los ejercicios no archivados de esa partida, dominados incluidos, en orden de jugada y sin pasar por la lista. Al salir, SHALL volver a la partida.
 
 #### Scenario: Ejercicio de error u oportunidad perdida
 - **WHEN** aparece un ejercicio `mistake` o `miss`
@@ -77,82 +85,148 @@ La sesión SHALL incluir los tres tipos. Solo SHALL poder filtrarse por "De qui�
 - **WHEN** aparece un ejercicio `brilliant`
 - **THEN** el tablero está orientado al bando que mueve, con el texto "Hay una jugada brillante. Encuéntrala.", y no resalta la última jugada
 
-#### Scenario: Nuevos de partidas recientes
-- **WHEN** no hay ejercicios vencidos y hay ejercicios nuevos de una partida de ayer y de una de hace un mes
-- **THEN** la sesión empieza por los de la partida de ayer
+#### Scenario: Prioridad
+- **WHEN** el usuario tiene 4 ejercicios nuevos, 3 fallados, 5 repasos vencidos y 20 acertados que aún no vencen
+- **THEN** la sesión tiene 10: los 7 nuevos y fallados en orden aleatorio, y luego 3 de los 5 vencidos al azar
+- **AND** ninguno de los 20 que no vencen
+
+#### Scenario: Orden distinto
+- **WHEN** el usuario pulsa "Empezar", sale sin resolver nada y vuelve a pulsar "Empezar" con 15 ejercicios nuevos
+- **THEN** la segunda sesión no es, en general, la misma secuencia que la primera
+
+#### Scenario: Fallo sin repetición
+- **WHEN** en una sesión de 10 el usuario falla el ejercicio 3
+- **THEN** la sesión sigue teniendo 10 ejercicios y termina en el 10/10
+- **AND** el ejercicio fallado aparece en la siguiente sesión
+
+#### Scenario: Practicar partida
+- **WHEN** el usuario toca "Practicar partida" en una partida con 5 ejercicios, 1 de ellos dominado
+- **THEN** empieza una sesión con los 5 en orden de jugada, sin pasar por `/practicar`
 
 #### Scenario: Sin ejercicios
 - **WHEN** el usuario no tiene ejercicios
 - **THEN** se le invita a importar y analizar partidas
 
 ### Requirement: Validar la respuesta
-- En `brilliant`, solo la jugada Brillante SHALL ser correcta.
-- En `mistake`, SHALL ser correcta una jugada de `accepted_uci` (la mejor, más la segunda línea si pierde < 0.05 EP). Si no está, el motor del cliente SHALL analizar la posición previa a profundidad 14 con `searchmoves` para la jugada del usuario y para `best_uci`. Es correcta si pierde < 0.05 EP.
+- En `brilliant`, y en `miss` con `brilliant_played = false`, solo la jugada Brillante SHALL ser correcta.
+- En `mistake` y en `miss`, SHALL ser correcta una jugada de `accepted_uci`: la mejor, más la segunda línea si pierde < 0.05 EP. En `miss`, la segunda además tiene que dejar `EP ≥ MISS_WIN`.
+- Si la jugada no está en la lista, el motor del cliente SHALL analizar la posición previa a profundidad 14 con `searchmoves`, para la jugada del usuario y para `best_uci`.
+  - Es correcta si pierde < 0.05 EP.
+  - En `miss` (sin Brillante) además tiene que dejar `EP ≥ MISS_WIN` para quien mueve.
+- La jugada que se hizo en la partida (`played_uci`) no SHALL ser correcta nunca, salvo que sea la propia respuesta (Brillante jugada). Se rechaza sin consultar al motor.
+
+La misma regla SHALL aplicarse en "Reintentar" y en "Repasar partida", con la jugada de la partida en esa posición.
 
 #### Scenario: Alternativa válida
 - **WHEN** en un ejercicio `mistake` el usuario juega una jugada que no está en `accepted_uci` pero pierde solo 0.03 EP
 - **THEN** se marca correcta con el texto "Buena jugada; la del motor era Cxe5"
+
+#### Scenario: Repetir la jugada de la partida
+- **WHEN** en el ejercicio `miss` de CarlosAPV vs JihadGhaziri (jugada O-O, mejor a4) el usuario juega O-O
+- **THEN** se marca incorrecta aunque a profundidad 14 pierda menos de 0.05 EP
+
+#### Scenario: Oportunidad perdida que no conserva la ventaja
+- **WHEN** en un ejercicio `miss` el usuario juega una alternativa que pierde 0.04 EP pero deja `EP = 0.60`
+- **THEN** se marca incorrecta
 
 #### Scenario: Respuesta incorrecta
 - **WHEN** el usuario juega una jugada que pierde 0.15 EP
 - **THEN** se marca incorrecta y se ofrecen "Reintentar", "Pista" y "Ver solución"
 
 ### Requirement: Explicar el error
-Después de cada respuesta, el sistema SHALL mostrar la jugada original con su icono y quién la jugó, con la evaluación antes y después. Para el dueño dice "Jugaste" o "Tu rival jugó"; para cualquier otra persona, el nombre del jugador ("CarlosAPV jugó exd5").
+Después de cada respuesta, el sistema SHALL mostrar:
+- la jugada original con su número y su icono;
+- quién la jugó;
+- la evaluación antes y después.
 
-En `mistake` y `miss` SHALL ofrecer "Lo que podía pasar" (la refutación) y "Mejor línea". Ninguna SHALL reproducirse sola: el usuario las recorre con ◀ ▶ (botones y teclado) y puede volver a la posición del ejercicio.
+Para el dueño dice "Jugaste" o "Tu rival jugó"; para cualquier otra persona, el nombre del jugador ("CarlosAPV jugó 11. exd5").
+
+SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en este orden: "Mejor línea", "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente) y "Ver en la partida" (solo el dueño). No SHALL haber "Lo que podía pasar".
 
 Tras la respuesta, el tablero SHALL quedarse en la jugada del usuario con el icono de su resultado:
 - si es correcta, el icono de Mejor (o de Brillante en `brilliant`);
 - si es incorrecta, el de su clasificación.
 
-La jugada original de la partida SHALL mostrarse en el panel ("En la partida: exd5" con su icono) y en el tablero solo dentro de "Lo que podía pasar". Así el icono del tablero nunca contradice el veredicto.
+La jugada original de la partida SHALL mostrarse solo en el panel ("En la partida: 11. exd5" con su icono). Así el icono del tablero nunca contradice el veredicto.
 
 #### Scenario: Correcto sin contradicción
-- **WHEN** el usuario acierta un ejercicio `miss` cuya jugada original fue exd5
+- **WHEN** el usuario acierta un ejercicio `miss` cuya jugada original fue 11. exd5
 - **THEN** el tablero muestra su jugada con el icono de Mejor junto a "¡Correcto!"
-- **AND** el panel dice "En la partida: exd5" con el icono de Oportunidad perdida
+- **AND** el panel dice "En la partida: jugaste 11. exd5" con el icono de Oportunidad perdida
 
-#### Scenario: Ver la refutación a mano
-- **WHEN** el usuario resuelve un ejercicio de un Blunder que dejaba mate
-- **THEN** ve "Jugaste Df3??" y el tablero no se mueve solo
-- **AND** al tocar "Lo que podía pasar" y luego ▶, avanza una jugada por toque hasta el mate
+#### Scenario: Mejor línea a mano
+- **WHEN** el usuario resuelve un ejercicio y toca "Mejor línea"
+- **THEN** el tablero no se mueve solo y ▶ avanza una jugada por toque
 
 ### Requirement: Repetición espaciada
-Cada ejercicio SHALL llevar una caja de Leitner:
-- correcto al primer intento sin pista: `box + 1`;
-- incorrecto, con pista o con solución vista: `box = 0`.
+Cada ejercicio SHALL llevar en `box` su racha de aciertos seguidos, de 0 a 3.
 
-`due_at` SHALL calcularse con intervalos de 0, 1, 3, 7 y 21 días para las cajas 0 a 4. La caja 5 SHALL marcarse dominada y salir de la cola.
+Un **acierto** es correcto al primer intento, sin pista y sin ver la solución. Hace `box = min(3, box + 1)`. Cualquier otro resultado SHALL poner `box = 0` y `due_at = ahora`.
 
-El cliente SHALL enviar un solo `practice.submitResult({ exerciseId, firstTryCorrect, usedHint, viewedSolution })` por ejercicio, en cuanto el resultado queda fijado (al acertar o al ver la solución), no al pasar al siguiente.
+`due_at` SHALL calcularse así:
 
-El servidor SHALL calcular la caja y registrar el resultado en `exercise_attempts`. No SHALL cambiar la caja:
-- la repetición al final de la sesión;
-- un ejercicio ya intentado que aún no vence (`due_at > ahora`), por ejemplo abierto desde su enlace.
+| `box` | `due_at` |
+|---|---|
+| 0 | ahora |
+| 1 | ahora + 60 días |
+| 2 | ahora + 180 días |
+| 3 | dominado: no vuelve a "Empezar" (`due_at` = ahora + 180 días, sin uso) |
 
-#### Scenario: Repetición en la misma sesión
-- **WHEN** un ejercicio fallado reaparece al final de la sesión y ahora se acierta
-- **THEN** sigue en caja 0, porque solo cuenta el primer resultado de la sesión
+Todo resultado del dueño SHALL contar igual, venga de "Empezar", de "Practicar partida" o de `/practicar/<id>`, aunque el ejercicio todavía no venza.
 
-#### Scenario: Acierto
-- **WHEN** un ejercicio en caja 2 se resuelve a la primera
-- **THEN** pasa a caja 3 y vuelve a aparecer en 7 días
+El cliente SHALL enviar un solo `practice.submitResult({ exerciseId, firstTryCorrect, usedHint, viewedSolution })` por ejercicio abierto, en cuanto el resultado queda fijado (al acertar o al ver la solución), no al pasar al siguiente. El servidor SHALL calcular `box` y `due_at` y registrar el resultado en `exercise_attempts`.
+
+La migración `0003` SHALL convertir las cajas existentes:
+- `box` pasa al mínimo entre la caja vieja, los aciertos limpios seguidos al final del historial de intentos y 3;
+- `due_at` se calcula según la tabla, contando desde el último intento.
+
+Así la racha migrada nunca es mayor que la real.
+
+#### Scenario: Primer acierto
+- **WHEN** un ejercicio nuevo se acierta
+- **THEN** pasa a `box = 1` y no vuelve a "Empezar" en 60 días
+
+#### Scenario: Segundo acierto
+- **WHEN** un ejercicio con `box = 1` se acierta
+- **THEN** pasa a `box = 2` y vuelve en 180 días
+
+#### Scenario: Dominado
+- **WHEN** un ejercicio con `box = 2` se acierta
+- **THEN** pasa a `box = 3`, cuenta como dominado y no vuelve a "Empezar"
 
 #### Scenario: Fallo
-- **WHEN** un ejercicio en caja 3 se falla
-- **THEN** vuelve a caja 0 y puede reaparecer en la misma sesión del día
+- **WHEN** un ejercicio con `box = 2` se falla, o se resuelve con pista
+- **THEN** vuelve a `box = 0` y entra con prioridad en la siguiente sesión
 
-#### Scenario: Abierto antes de tiempo
-- **WHEN** el dueño abre por enlace un ejercicio en caja 2 que vence en 3 días y lo acierta
-- **THEN** se registra el intento, pero sigue en caja 2 con la misma `due_at`
+#### Scenario: Tres veces desde la lista
+- **WHEN** el dueño abre un ejercicio nuevo desde la lista y lo acierta, y repite lo mismo dos veces más
+- **THEN** el ejercicio queda dominado y no sale en "Empezar"
+
+#### Scenario: Dominado fallado en Practicar partida
+- **WHEN** en "Practicar partida" el usuario falla un ejercicio dominado
+- **THEN** vuelve a `box = 0` y entra de nuevo en "Empezar"
+
+#### Scenario: Migración
+- **WHEN** se aplica `0003` sobre estos ejercicios:
+  - uno con `box = 1` y 4 aciertos seguidos, el último hace 10 días;
+  - uno con `box = 2` cuyo último intento, hace 10 días, fue un fallo que la regla vieja no contó;
+  - uno con `box = 5` y 5 aciertos seguidos;
+  - uno nuevo sin intentos.
+- **THEN** quedan, respectivamente, con:
+  - `box = 1` y `due_at` en 50 días;
+  - `box = 0` y `due_at` = ahora;
+  - `box = 3`, dominado;
+  - `box = 0` y `due_at` = ahora.
 
 #### Scenario: Cerrar la pestaña tras acertar
 - **WHEN** el usuario acierta un ejercicio y cierra la pestaña sin pulsar "Siguiente"
 - **THEN** el resultado ya quedó guardado
 
 ### Requirement: Resumen de progreso
-La sección Practicar SHALL mostrar los ejercicios pendientes de hoy, los dominados y la racha de días practicando. La racha se calcula en la zona horaria del navegador, enviada como `tz`.
+La sección Practicar SHALL mostrar los ejercicios pendientes de hoy, los dominados y la racha de días practicando:
+- pendientes: los mismos que podría tomar "Empezar";
+- dominados: `box = 3`;
+- racha: calculada en la zona horaria del navegador, enviada como `tz`.
 
 No SHALL mostrar la tabla de conteos por tipo y clase.
 
@@ -161,9 +235,15 @@ No SHALL mostrar la tabla de conteos por tipo y clase.
 - **THEN** ve "Pendientes hoy: 7 · Dominados: 23 · Racha: 4 días", los filtros, el botón "Empezar" y la lista de ejercicios
 
 ### Requirement: Lista de ejercicios
-Debajo del botón "Empezar", `/practicar` SHALL listar los ejercicios no archivados del usuario, de 12 en 12 y con paginación, aplicando los mismos filtros que la sesión.
+Debajo del botón "Empezar", `/practicar` SHALL listar los ejercicios no archivados del usuario, aplicando los mismos filtros que la sesión. SHALL cargar 28 al inicio y 28 más cada vez que el usuario llega al final de la lista con el scroll. No SHALL haber paginación.
 
-El orden SHALL ser de lo más reciente a lo más antiguo: por la fecha de la partida (o la de importación si no la tiene), luego la de importación y luego el ply.
+Si la carga automática no está disponible o falla, SHALL mostrarse "Cargar más". Ningún ejercicio SHALL aparecer dos veces.
+
+El orden SHALL ser de lo más reciente a lo más antiguo, siempre el mismo:
+1. por la fecha de la partida, o la de importación si no la tiene;
+2. luego por la de importación;
+3. luego por la partida;
+4. luego por el ply.
 
 Cada tarjeta SHALL mostrar:
 - una miniatura de la posición del ejercicio, orientada al bando que mueve;
@@ -171,29 +251,70 @@ Cada tarjeta SHALL mostrar:
 - el icono del tipo (Error grave, Brillante u Oportunidad perdida);
 - si está dominado.
 
-Tocar una tarjeta SHALL abrir el ejercicio en `/practicar/<id>`. La página SHALL estar en la URL (`?pagina=2`) para que atrás y recargar conserven la posición.
+Tocar una tarjeta SHALL abrir el ejercicio en `/practicar/<id>`, conservando los filtros activos en la URL (`?lado=`, `?partida=`).
 
-#### Scenario: Paginación con filtro
-- **WHEN** el usuario tiene 30 ejercicios, filtra "De rivales" (14) y va a la página 2
-- **THEN** ve los ejercicios 13 y 14 de rivales y la URL es `/practicar?lado=rivales&pagina=2`
+#### Scenario: Carga al hacer scroll
+- **WHEN** el usuario tiene 60 ejercicios y abre `/practicar`
+- **THEN** ve 28 tarjetas
+- **AND** al llegar al final se cargan 28 más, y después las 4 restantes, sin repetir ninguna
 
-#### Scenario: Página fuera de rango
-- **WHEN** la URL pide `?pagina=99` y solo hay 2 páginas
-- **THEN** se muestra la última página
+#### Scenario: Cambiar el filtro
+- **WHEN** el usuario cargó 56 ejercicios y cambia "De quién" a "De rivales"
+- **THEN** la lista vuelve a empezar con los primeros 28 de rivales
+
+#### Scenario: Enlace viejo con página
+- **WHEN** alguien abre `/practicar?pagina=3`
+- **THEN** ve la primera tanda de la lista y no hay error
 
 ### Requirement: Ejercicio por URL
-Cada ejercicio SHALL poder abrirse en `/practicar/<id>` y tener un botón "Compartir" (Web Share API, o copiar el enlace si no está disponible).
+Cada ejercicio SHALL poder abrirse en `/practicar/<id>` y tener un botón "Compartir" con dos opciones:
+- **Enlace:** Web Share API con la URL, o copiarla si no está disponible.
+- **Imagen:** un PNG de la posición, orientado al bando que mueve, con coordenadas y la leyenda "Juegan blancas" o "Juegan negras", y nada más. Sin nombres, evaluación, última jugada ni URL.
+  - En un dispositivo táctil que puede compartir archivos, SHALL abrirse la hoja nativa de compartir.
+  - En los demás casos (escritorio, o si compartir falla), SHALL descargarse `ejercicio.png`.
+  - Si la imagen no puede generarse, SHALL decirlo, y "Enlace" sigue disponible.
 
+Reglas de acceso:
 - El dueño SHALL resolverlo igual que en una sesión, y el resultado SHALL contar para su repetición espaciada.
-- Cualquier otra persona, con o sin sesión, SHALL poder resolverlo (decisión del usuario). No se guarda ningún resultado. Solo se muestran la posición, las jugadas y los nombres de los jugadores de la partida; nunca el correo, el id del dueño, su caja ni el enlace a la partida.
+- Tras el resultado, el dueño SHALL ver "Siguiente", que abre el siguiente ejercicio de la lista con los mismos filtros que traía la URL. Si es el último, o si ya no está en la lista, SHALL ver "Volver a la lista".
+- Cualquier otra persona, con o sin sesión, SHALL poder resolverlo. No se guarda ningún resultado ni se ofrece "Siguiente". Solo se muestran la posición, las jugadas y los nombres de los jugadores de la partida; nunca el correo, el id del dueño, su caja ni el enlace a la partida.
 
 El servidor SHALL limitar las lecturas por IP sin sesión, o por usuario con sesión. Un id mal formado, inexistente, archivado o de una partida borrada SHALL dar la misma respuesta: "No encontramos ese ejercicio".
 
-#### Scenario: Compartir
-- **WHEN** el dueño toca "Compartir" en un ejercicio y otra persona sin cuenta abre el enlace
+#### Scenario: Compartir enlace
+- **WHEN** el dueño elige "Compartir → Enlace" y otra persona sin cuenta abre el enlace
 - **THEN** esa persona resuelve el ejercicio con pista, solución y explicación, y no se llama a `practice.submitResult`
+
+#### Scenario: Compartir imagen en celular
+- **WHEN** en Android Chrome el usuario elige "Compartir → Imagen"
+- **THEN** se abre la hoja nativa con un PNG del tablero y la leyenda "Juegan negras", sin otros textos
+
+#### Scenario: Imagen en escritorio
+- **WHEN** en Chrome o Firefox de escritorio el usuario elige "Imagen"
+- **THEN** se descarga `ejercicio.png`, sin abrir la hoja de compartir del sistema
+
+#### Scenario: Siguiente desde la lista
+- **WHEN** el dueño abre desde la lista filtrada "Mías" el tercer ejercicio y lo resuelve
+- **THEN** "Siguiente" abre el cuarto ejercicio de esa lista filtrada
+
+#### Scenario: Último de la lista
+- **WHEN** el dueño resuelve el último ejercicio de la lista
+- **THEN** ve "Volver a la lista" en lugar de "Siguiente"
 
 #### Scenario: Id inválido
 - **WHEN** alguien abre `/practicar/123`, un uuid que no existe o un ejercicio archivado
 - **THEN** ve "No encontramos ese ejercicio" con un enlace a Practicar
+
+### Requirement: Sin duplicados por posición
+Un usuario no SHALL tener dos ejercicios activos con la misma posición. La posición se identifica por tablero, turno, enroques y al paso; los relojes no cuentan.
+
+Al guardar un análisis, un ejercicio cuya posición ya esté activa en otra partida del usuario, o repetida dentro de la misma partida, no SHALL crearse.
+
+#### Scenario: Partida importada dos veces
+- **WHEN** el usuario importa la misma partida desde Lichess y como PGN y analiza las dos
+- **THEN** sus ejercicios existen una sola vez
+
+#### Scenario: Apertura repetida
+- **WHEN** dos partidas del usuario llegan a la misma posición con el mismo error
+- **THEN** solo la primera analizada genera el ejercicio
 
