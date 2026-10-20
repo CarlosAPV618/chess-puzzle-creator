@@ -1,4 +1,4 @@
-import { TEST_DATABASE_URL } from "./env";
+import { TEST_ADMIN_URL, TEST_DATABASE_NAME, TEST_DATABASE_URL } from "./env";
 
 import { fileURLToPath } from "node:url";
 
@@ -11,8 +11,16 @@ import type { Context } from "~/server/api/trpc";
 import { db } from "~/server/db";
 import { user } from "~/server/db/schema";
 
-/** Drop and recreate the `public` and `drizzle` schemas, then apply every migration. */
+/** Create this file's database if needed, drop and recreate its schemas, then apply every migration. */
 export async function resetDb() {
+  const admin = postgres(TEST_ADMIN_URL, { max: 1, onnotice: () => {} });
+  try {
+    await admin.unsafe(`create database "${TEST_DATABASE_NAME}"`);
+  } catch (e) {
+    if ((e as { code?: string }).code !== "42P04") throw e; // already exists
+  } finally {
+    await admin.end();
+  }
   const sql = postgres(TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
   try {
     await sql.unsafe(`

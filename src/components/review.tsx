@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { Arrow } from "react-chessboard";
 import type { Color, Eval, GameAnalysis } from "~/lib/types";
 import { acceptedMoves, getEngine, judgeMove } from "~/hooks/use-engine";
+import { MISS_WIN } from "~/lib/classify";
 import { Board } from "./board";
-import { applyUci, formatEval, prettySan, replay, sanOf, turnOf, uciFrom, uciTo } from "./chess";
+import { applyUci, formatEval, moveLabel, prettySan, replay, sanOf, sideName, turnOf, uciFrom, uciTo } from "./chess";
 import { CLASS_META, ClassIcon, RETRY_CLASSES } from "./class-icon";
 import { EvalBar } from "./eval-bar";
 import { EvalGraph } from "./eval-graph";
@@ -74,7 +75,7 @@ export function GameReview({
   liveEvals?: Eval[];
   /** Controles de la página (analizar, guardar, aviso de reanálisis...): arriba sin análisis, debajo del resumen con él. */
   toolbar?: ReactNode;
-  /** Botones extra de la fila bajo el tablero (p. ej. "Practicar esta partida"). */
+  /** Botones extra de la fila bajo el tablero, entre Repasar y Girar (p. ej. "Practicar partida"); usan `REVIEW_ROW_BTN`. */
   actions?: ReactNode;
 }) {
   const { fens, sans } = useMemo(() => replay(game.startFen, game.movesUci), [game.startFen, game.movesUci]);
@@ -151,14 +152,18 @@ export function GameReview({
   async function attempt(uci: string) {
     if (!trial || !analysis || !pos?.best) return;
     const fen = fens[trial.move]!;
+    const cls = analysis.moves[trial.move]?.class;
     setTrial({ ...trial, tried: uci, status: "checking" });
     try {
+      // D1: la jugada de la partida nunca es correcta, y en una Oportunidad perdida la alternativa debe seguir ganando.
       const v = await judgeMove({
         startFen: game.startFen,
         movesBefore: game.movesUci.slice(0, trial.move),
         uci,
         bestUci: pos.best.uci,
-        accepted: [...acceptedMoves(pos, fen), ...(missedBrilliant ? [missedBrilliant] : [])],
+        accepted: [...acceptedMoves(pos, fen, cls), ...(missedBrilliant ? [missedBrilliant] : [])],
+        playedUci: game.movesUci[trial.move],
+        minPoints: cls === "miss" ? MISS_WIN : undefined,
       });
       const bestSan = prettySan(sanOf(fen, pos.best.uci));
       const msg = !v.correct
@@ -195,8 +200,6 @@ export function GameReview({
     setTrial(null);
     setReview({ side, moments, results: {}, finished: false, paused: false, pending: null });
     setPly(0);
-    // En celular el botón está en la barra fija: lleva el tablero a la vista.
-    colRef.current?.scrollIntoView({ block: "start" });
   }
 
   function exitReview() {
@@ -272,7 +275,6 @@ export function GameReview({
 
   // Rueda del mouse sobre el tablero: abajo avanza, arriba retrocede (como chess.com y Lichess).
   const boardRef = useRef<HTMLDivElement>(null);
-  const colRef = useRef<HTMLDivElement>(null);
   const stepRef = useRef<(d: number) => void>(() => undefined);
   stepRef.current = (d) => {
     if (!trial) goto(ply + d);
@@ -303,12 +305,9 @@ export function GameReview({
   );
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 pb-24 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:pb-6">
+    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 pb-[calc(3rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:pb-0">
       {/* Columna del tablero */}
-      <div
-        ref={colRef}
-        className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] scroll-mt-[calc(4rem+env(safe-area-inset-top))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-15rem))]"
-      >
+      <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-13rem))] flex-col gap-1.5 lg:max-w-[min(100%,calc(100dvh-15rem))]">
         {player(topIsWhite)}
         <div ref={boardRef} className="flex gap-1.5">
           <EvalBar value={shownEval} fen={fen} orientation={orientation} />
@@ -326,23 +325,30 @@ export function GameReview({
           </div>
         </div>
         {player(!topIsWhite)}
-        <div className="flex flex-wrap gap-2">
+        {/* Una sola fila desde 360 px (D7): Repasar/Salir → actions → Girar. */}
+        <div className="flex flex-nowrap gap-1.5">
           {analysis &&
             (review && !review.finished ? (
-              <button type="button" onClick={exitReview} className="btn-secondary">
-                <X className="size-4" /> Salir del repaso
+              <button type="button" onClick={exitReview} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                <X className="hidden size-4 sm:block" /> Salir del repaso
               </button>
             ) : (
               !review && (
-                <button type="button" onClick={() => startReview(reviewSide)} className="btn-secondary">
-                  <GraduationCap className="size-4" /> Repasar partida
+                <button type="button" onClick={() => startReview(reviewSide)} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                  <GraduationCap className="hidden size-4 sm:block" /> Repasar partida
                 </button>
               )
             ))}
-          <button type="button" aria-label="Girar tablero" title="Girar tablero" onClick={() => setFlipped(!flipped)} className="btn-secondary px-3">
+          {actions}
+          <button
+            type="button"
+            aria-label="Girar tablero"
+            title="Girar tablero"
+            onClick={() => setFlipped(!flipped)}
+            className="btn-secondary size-11 shrink-0 px-0"
+          >
             <RefreshCw className="size-4" />
           </button>
-          {actions}
         </div>
       </div>
 
@@ -357,7 +363,7 @@ export function GameReview({
             prompt={
               missedBrilliant
                 ? "Había una jugada brillante. Encuéntrala."
-                : `Encuentra una jugada mejor que ${prettySan(sans[trial.move] ?? "")}`
+                : `Encuentra una jugada mejor que ${moveLabel(fens[trial.move]!, sans[trial.move] ?? "")} (${sideName(fens[trial.move]!)})`
             }
             onRetry={() => setTrial({ ...trial, tried: null, status: "idle", msg: undefined })}
             onHint={() => setTrial({ ...trial, hint: true })}
@@ -402,7 +408,7 @@ export function GameReview({
           </div>
         ) : review && review.pending !== null ? (
           <PendingPanel
-            san={sans[review.pending]!}
+            label={moveLabel(fens[review.pending]!, sans[review.pending]!)}
             cls={analysis?.moves[review.pending]?.class ?? "mistake"}
             who={review.side === game.userColor ? "Tu jugada" : `Jugada de ${review.side === "w" ? game.white : game.black}`}
             brilliant={!!analysis?.moves[review.pending]?.brilliantMissed}
@@ -422,15 +428,21 @@ export function GameReview({
               <Undo2 className="size-4" /> Volver a la partida
             </button>
           </div>
+        ) : prevAnalysis ? (
+          <MoveVerdict
+            label={moveLabel(fens[prevMove]!, sans[prevMove]!)}
+            cls={prevAnalysis.class}
+            bestSan={!reviewing && prevBest && prevBest.uci !== game.movesUci[prevMove] ? sanOf(fens[prevMove]!, prevBest.uci) : null}
+            evalText={formatEval(evals[ply], fen)}
+            onRetry={RETRY_CLASSES.includes(prevAnalysis.class) && !review ? () => startTrial(prevMove) : undefined}
+          />
         ) : (
-          prevAnalysis && (
-            <MoveVerdict
-              san={sans[prevMove]!}
-              cls={prevAnalysis.class}
-              bestSan={!reviewing && prevBest && prevBest.uci !== game.movesUci[prevMove] ? sanOf(fens[prevMove]!, prevBest.uci) : null}
-              evalText={formatEval(evals[ply], fen)}
-              onRetry={RETRY_CLASSES.includes(prevAnalysis.class) && !review ? () => startTrial(prevMove) : undefined}
-            />
+          // Mismo hueco en el ply 0 para que la gráfica no salte al pasar a la jugada 1.
+          analysis &&
+          ply === 0 && (
+            <div className={VERDICT_BOX}>
+              <p className="truncate font-semibold text-muted">Posición inicial</p>
+            </div>
           )
         )}
 
@@ -443,9 +455,9 @@ export function GameReview({
           </div>
         )}
 
-        {(analysis ?? liveEvals?.length) ? <EvalGraph evals={evals} fens={fens} classes={classes} ply={ply} onSelect={goto} /> : null}
+        {(analysis ?? liveEvals?.length) ? <EvalGraph evals={evals} fens={fens} classes={classes} ply={ply} markColor={game.userColor} onSelect={goto} /> : null}
 
-        <div className="rounded-lg bg-panel p-1 lg:p-2">
+        <div className="rounded-lg bg-panel px-1 lg:p-2">
           <MoveList sans={sans} classes={classes} ply={ply} startsWithBlack={firstColor === "b"} startMoveNumber={Number(game.startFen.split(" ")[5] ?? 1)} onSelect={goto} />
         </div>
 
@@ -455,7 +467,7 @@ export function GameReview({
 
         {analysis && toolbar && <div className="flex flex-wrap gap-2">{toolbar}</div>}
 
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-ink/95 px-3 py-2 backdrop-blur md:bottom-0 lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-ink/95 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur lg:static lg:order-first lg:border-0 lg:bg-transparent lg:p-0">
           <NavBar ply={ply} max={N} onChange={goto} />
         </div>
       </div>
@@ -478,14 +490,20 @@ function PlayerBar({ name, elo, white, accuracy }: { name: string; elo?: number 
   );
 }
 
+/** Botón de texto de la fila bajo el tablero: reparte el ancho y no parte la línea en 360 px. */
+export const REVIEW_ROW_BTN = "min-w-0 flex-1 whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-sm";
+/** Alto fijo del veredicto: la gráfica no salta al cambiar de jugada. */
+const VERDICT_BOX = "flex h-[4.25rem] items-center gap-3 rounded-lg bg-panel px-3";
+
 function MoveVerdict({
-  san,
+  label,
   cls,
   bestSan,
   evalText,
   onRetry,
 }: {
-  san: string;
+  /** "12. b5" */
+  label: string;
   cls: GameAnalysis["moves"][number]["class"];
   bestSan: string | null;
   evalText: string;
@@ -493,11 +511,11 @@ function MoveVerdict({
 }) {
   const meta = CLASS_META[cls];
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-panel p-3">
+    <div className={VERDICT_BOX}>
       <ClassIcon cls={cls} size={32} />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">
-          {prettySan(san)} <span style={{ color: meta.color }}>{CLASS_PHRASE[cls]}</span>
+        <p className="truncate font-semibold">
+          {label} <span style={{ color: meta.color }}>{CLASS_PHRASE[cls]}</span>
         </p>
         <p className="truncate text-sm text-muted">
           <span className="font-mono">{evalText}</span>
@@ -581,14 +599,15 @@ function TrialPanel({
 }
 
 function PendingPanel({
-  san,
+  label,
   cls,
   who,
   brilliant,
   onReview,
   onContinue,
 }: {
-  san: string;
+  /** "12. b5" */
+  label: string;
   cls: GameAnalysis["moves"][number]["class"];
   who: string;
   brilliant: boolean;
@@ -602,7 +621,7 @@ function PendingPanel({
         <ClassIcon cls={cls} size={36} />
         <div className="min-w-0">
           <p className="text-lg font-bold">
-            {prettySan(san)} <span style={{ color: meta.color }}>{CLASS_PHRASE[cls]}</span>
+            {label} <span style={{ color: meta.color }}>{CLASS_PHRASE[cls]}</span>
           </p>
           <p className="truncate text-sm text-muted">{who}</p>
         </div>

@@ -15,7 +15,7 @@ export function EvalBar({ value, fen, orientation }: { value?: Eval; fen?: strin
       aria-valuemax={100}
       aria-valuenow={Math.round(share * 100)}
       aria-valuetext={label}
-      className={`relative flex w-3.5 shrink-0 overflow-hidden rounded-sm bg-[#3b3f3c] sm:w-6 ${flip ? "flex-col" : "flex-col-reverse"}`}
+      className={`relative flex w-3.5 shrink-0 overflow-hidden select-none [-webkit-touch-callout:none] rounded-sm bg-[#3b3f3c] sm:w-6 ${flip ? "flex-col" : "flex-col-reverse"}`}
     >
       <div className="bg-[#f2f3ee] transition-[height] duration-500 ease-out" style={{ height: `${share * 100}%` }} />
       <span

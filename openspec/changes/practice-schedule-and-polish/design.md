@@ -179,7 +179,7 @@ select nxt from o where id = $id
 - debajo, solo "Juegan blancas" o "Juegan negras", en `system-ui`, para no depender de que Geist esté cargada en el canvas;
 - sin nombres, evaluación, última jugada, logo ni URL ("sin más contexto").
 
-**Piezas.** Los SVG cburnett solo traen `viewBox` (comprobado: `<svg … viewBox="0 0 45 45">`, sin `width`/`height`). Firefox no dibuja en canvas un SVG sin tamaño intrínseco. Por eso se piden con `fetch`, se les añade `width="45" height="45"` y se cargan desde un `blob:` del mismo origen, con `img.decode()`. Son 12 piezas y se cachean en memoria. `[POR VERIFICAR]` que el canvas no queda bloqueado en Safari y Firefox (tarea 4.3). Si `toBlob` lanza `SecurityError`, se muestra "No se pudo crear la imagen" y el enlace sigue disponible.
+**Piezas.** Los reyes cburnett (`wK`, `bK`) solo traen `viewBox`; las demás ya tienen `width="45" height="45"` (comprobado el 2026-10-19: repetir los atributos deja el XML inválido y `decode()` falla). Firefox no dibuja en canvas un SVG sin tamaño intrínseco. Por eso se piden con `fetch`, se les añade `width="45" height="45"` solo si faltan y se cargan desde un `blob:` del mismo origen, con `img.decode()`. Son 12 piezas y se cachean en memoria. `[POR VERIFICAR]` que el canvas no queda bloqueado en Safari y Firefox (tarea 4.3). Si `toBlob` lanza `SecurityError`, se muestra "No se pudo crear la imagen" y el enlace sigue disponible.
 
 **Celular contra escritorio.** El usuario pidió "descargar una imagen", conservando en celular la hoja nativa:
 - con `matchMedia("(pointer: coarse)")` y `navigator.canShare({ files: [png] })`: `navigator.share({ files })`, la hoja nativa con redes sociales;

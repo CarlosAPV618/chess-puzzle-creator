@@ -82,7 +82,7 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
   for (const s of marks) squareStyles[s] = { ...squareStyles[s], ...MARK };
 
   return (
-    <div className="relative aspect-square w-full touch-manipulation select-none shadow-[0_10px_40px_-12px_#000]">
+    <div className="relative aspect-square w-full touch-manipulation select-none [-webkit-touch-callout:none] shadow-[0_10px_40px_-12px_#000]">
       <Chessboard
         options={{
           id,

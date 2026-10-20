@@ -1,19 +1,19 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Flame, Loader2, Play, Trophy, X } from "lucide-react";
+import { Flame, Loader2, Play, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { ClassIcon } from "~/components/class-icon";
 import { EngineNotice } from "~/components/engine-notice";
-import { ExerciseView, type Exercise, type Outcome } from "~/components/exercise";
+import { ExerciseView, practiceFilters, type Exercise, type Outcome } from "~/components/exercise";
 import { MiniBoard } from "~/components/mini-board";
 import { netError } from "~/components/pwa";
+import { dedupe, LoadMore, useLoadMore } from "~/hooks/use-load-more";
 import type { Classification, ExerciseKind } from "~/lib/types";
 import { api } from "~/trpc/react";
 
 const KIND_ICON: Record<ExerciseKind, Classification> = { mistake: "blunder", brilliant: "brilliant", miss: "miss" };
-const SIDES = { mias: "me", rivales: "opponent" } as const;
 
 export default function PracticePage() {
   return (
@@ -27,26 +27,33 @@ function Practice() {
   const params = useSearchParams();
   const router = useRouter();
   const lado = params.get("lado");
-  const side = lado === "mias" || lado === "rivales" ? SIDES[lado] : undefined;
-  // `game` es el nombre viejo del parámetro; se acepta para no romper enlaces.
-  const gameId = params.get("partida") ?? params.get("game") ?? undefined;
-  // "Practicar esta partida" (desde la partida): arranca la sesión sin pasar por la lista.
+  const { side, gameId, query } = practiceFilters(params);
+  // "Practicar partida" (desde la partida): arranca la sesión sin pasar por la lista.
   const direct = !!gameId && params.has("iniciar");
-  const page = Math.min(9999, Math.max(1, Math.trunc(Number(params.get("pagina"))) || 1));
   const [session, setSession] = useState<Exercise[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const utils = api.useUtils();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const summary = api.practice.summary.useQuery({ tz });
-  const list = api.practice.list.useQuery({ side, gameId, page }, { enabled: summary.data?.total !== 0 });
+  const list = api.practice.list.useInfiniteQuery(
+    { side, gameId },
+    { enabled: summary.data?.total !== 0, getNextPageParam: (l) => l.nextCursor },
+  );
+  const items = dedupe(list.data?.pages);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const auto = useLoadMore(
+    sentinel,
+    () => list.hasNextPage && !list.isFetching && !list.isFetchNextPageError && void list.fetchNextPage(),
+    list.data?.pages.length,
+  );
 
-  /** URL con los filtros cambiados; cambiar un filtro vuelve a la página 1. */
+  /** URL con los filtros cambiados (`?pagina=` viejo se descarta). */
   function href(change: Record<string, string | null>) {
     const q = new URLSearchParams(params);
     q.delete("game");
+    q.delete("pagina");
     if (gameId && !("partida" in change)) q.set("partida", gameId);
-    if (!("pagina" in change)) q.delete("pagina");
     for (const [k, v] of Object.entries(change)) {
       if (v) q.set(k, v);
       else q.delete(k);
@@ -98,8 +105,6 @@ function Practice() {
     );
 
   const s = summary.data;
-  const pages = list.data ? Math.max(1, Math.ceil(list.data.total / list.data.pageSize)) : 1;
-  const current = list.data?.page ?? page;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -155,12 +160,12 @@ function Practice() {
 
           <section aria-label="Ejercicios" className="mt-4">
             {list.isLoading && <Loader2 className="mx-auto mt-6 size-6 animate-spin text-muted" aria-label="Cargando" />}
-            {list.error && <p className="text-sm text-[#ffb4a8]">{netError(list.error, "No se pudieron cargar los ejercicios")}</p>}
-            {list.data?.total === 0 && <p className="card p-4 text-center text-sm text-muted">No hay ejercicios con esos filtros.</p>}
+            {list.error && !list.data && <p className="text-sm text-[#ffb4a8]">{netError(list.error, "No se pudieron cargar los ejercicios")}</p>}
+            {list.data?.pages[0]?.items.length === 0 && <p className="card p-4 text-center text-sm text-muted">No hay ejercicios con esos filtros.</p>}
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {list.data?.items.map((e) => (
+              {items.map((e) => (
                 <li key={e.id} className="min-w-0">
-                  <Link href={`/practicar/${e.id}`} className="card block p-2 transition hover:bg-raised">
+                  <Link href={`/practicar/${e.id}${query}`} className="card block p-2 transition hover:bg-raised">
                     <MiniBoard fen={e.fen} orientation={e.sideToMove === "b" ? "black" : "white"} />
                     <p className="mt-1.5 truncate text-sm font-semibold" title={`${e.white} vs ${e.black}`}>
                       {e.white} vs {e.black}
@@ -179,19 +184,11 @@ function Practice() {
                 </li>
               ))}
             </ul>
-            {pages > 1 && (
-              <nav aria-label="Páginas" className="mt-3 flex items-center justify-between gap-2">
-                <PageLink href={href({ pagina: String(current - 1) })} disabled={current <= 1} label="Página anterior">
-                  <ChevronLeft className="size-5" />
-                </PageLink>
-                <span className="text-sm text-muted">
-                  Página {current} de {pages}
-                </span>
-                <PageLink href={href({ pagina: String(current + 1) })} disabled={current >= pages} label="Página siguiente">
-                  <ChevronRight className="size-5" />
-                </PageLink>
-              </nav>
+            <div ref={sentinel} />
+            {list.hasNextPage && (!auto || list.isFetchNextPageError) && (
+              <LoadMore loading={list.isFetchingNextPage} error={list.isFetchNextPageError ? list.error : null} onClick={() => void list.fetchNextPage()} />
             )}
+            {list.isFetchingNextPage && auto && <Loader2 className="mx-auto mt-3 size-5 animate-spin text-muted" aria-label="Cargando" />}
           </section>
         </>
       )}
@@ -200,20 +197,6 @@ function Practice() {
         <EngineNotice />
       </div>
     </div>
-  );
-}
-
-function PageLink({ href, disabled, label, children }: { href: string; disabled: boolean; label: string; children: React.ReactNode }) {
-  if (disabled)
-    return (
-      <span aria-disabled className="btn-secondary px-3 opacity-35">
-        {children}
-      </span>
-    );
-  return (
-    <Link href={href} aria-label={label} className="btn-secondary px-3">
-      {children}
-    </Link>
   );
 }
 
@@ -231,8 +214,7 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
 
 // ---------------------------------------------------------------- Sesión
 
-function Session({ list: initial, onExit }: { list: Exercise[]; onExit: () => void }) {
-  const [list, setList] = useState(initial);
+function Session({ list, onExit }: { list: Exercise[]; onExit: () => void }) {
   const [i, setI] = useState(0);
   const [results, setResults] = useState<Record<string, Outcome>>({});
   const submit = api.practice.submitResult.useMutation();
@@ -250,13 +232,13 @@ function Session({ list: initial, onExit }: { list: Exercise[]; onExit: () => vo
 
   const ex = list[i];
   if (!ex) {
-    const first = initial.filter((e) => results[e.id]?.firstTryCorrect && !results[e.id]?.usedHint && !results[e.id]?.viewedSolution).length;
+    const first = list.filter((e) => results[e.id]?.firstTryCorrect && !results[e.id]?.usedHint && !results[e.id]?.viewedSolution).length;
     return (
       <div className="card mx-auto mt-8 max-w-md p-6 text-center">
         <Trophy className="mx-auto size-10 text-c-inaccuracy" />
         <p className="mt-2 text-xl font-bold">Sesión terminada</p>
         <p className="mt-1 text-muted">
-          {first} de {initial.length} a la primera
+          {first} de {list.length} a la primera
         </p>
         <button type="button" onClick={onExit} className="btn-primary mt-5 w-full">
           Continuar
@@ -265,12 +247,11 @@ function Session({ list: initial, onExit }: { list: Exercise[]; onExit: () => vo
     );
   }
 
-  // Se envía en cuanto el resultado queda fijado (D6). Uno por ejercicio: la repetición al final no cuenta.
+  // Se envía en cuanto el resultado queda fijado (D6). Un fallado no se repite en la sesión (D3).
   function result(o: Outcome) {
     if (!ex || results[ex.id]) return;
     setResults((r) => ({ ...r, [ex.id]: o }));
     submit.mutate({ exerciseId: ex.id, ...o }, { onError: (e) => setSaveError(netError(e, "No se pudo guardar el resultado")) });
-    if (!o.firstTryCorrect || o.usedHint || o.viewedSolution) setList((l) => [...l, ex]);
   }
 
   return (
@@ -294,7 +275,7 @@ function Session({ list: initial, onExit }: { list: Exercise[]; onExit: () => vo
         </span>
       </div>
       {saveError && <p className="mb-2 text-sm text-[#ffb4a8]">{saveError}</p>}
-      <ExerciseView key={`${ex.id}-${i}`} ex={ex} owner repeat={list.findIndex((e) => e.id === ex.id) < i} onResult={result} onNext={() => setI(i + 1)} />
+      <ExerciseView key={ex.id} ex={ex} owner onResult={result} onNext={() => setI(i + 1)} />
     </div>
   );
 }

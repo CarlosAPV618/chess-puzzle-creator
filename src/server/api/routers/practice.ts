@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gt, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { type Color, type Eval, type ExerciseKind, type ExerciseSide, type Phase } from "~/lib/types";
@@ -8,12 +8,10 @@ import { analyses, exerciseAttempts, exercises, games } from "~/server/db/schema
 import { clientIp } from "~/server/services/client-ip";
 import { enforceRateLimit } from "~/server/services/rate-limit";
 
-/** Leitner intervals in days for boxes 0..4; box 5 = mastered (D9). */
-export const BOX_INTERVAL_DAYS = [0, 1, 3, 7, 21] as const;
-export const MASTERED_BOX = 5;
-/** ponytail: a second result for the same exercise within this window counts as the in-session repeat. */
-const SESSION_REPEAT_MS = 30 * 60 * 1000;
-export const PAGE_SIZE = 12;
+/** `box` = clean solves in a row (D2). Days until due for 0..2; box 3 = mastered (due far away, unused). */
+export const BOX_INTERVAL_DAYS = [0, 60, 180] as const;
+export const MASTERED_BOX = 3;
+export const EXERCISES_PAGE = 28;
 
 const DAY_MS = 86_400_000;
 
@@ -72,8 +70,12 @@ const filters = { side: z.enum(["me", "opponent"]).optional(), gameId: z.string(
 const notFound = () => new TRPCError({ code: "NOT_FOUND", message: "No encontramos ese ejercicio" });
 
 const e = exercises;
-/** "Most recent" order shared by every list (D4): game date (or import date), import date, then ply. */
-const recentOrder = [sql`coalesce(${games.playedAt}, ${games.createdAt}) desc`, desc(games.createdAt), asc(e.ply)];
+/** "Most recent" order shared by every list (D4): game date (or import date), import date, game, then ply. */
+const recentOrder = [sql`coalesce(${games.playedAt}, ${games.createdAt}) desc`, desc(games.createdAt), desc(games.id), asc(e.ply)];
+/** Offset cursor for useInfiniteQuery (D12). */
+export const cursorSchema = z.number().int().min(0).max(100_000).nullish();
+/** "Empezar" and "Pendientes hoy" (D2): not mastered, and new/failed or due. */
+const dueFilter = and(lt(e.box, MASTERED_BOX), or(eq(e.box, 0), lte(e.dueAt, sql`now()`)));
 
 function ownerFilters(userId: string, input: { side?: "me" | "opponent"; gameId?: string }) {
   return [
@@ -133,7 +135,7 @@ function toDTO({ ex, white, black, lastMoveUci, bestPv, evalBefore, evalAfter }:
 }
 
 export const practiceRouter = createTRPCRouter({
-  /** Session (D4): attempted and due (most overdue first), then new ones from the most recent games. */
+  /** Session (D2): new and failed first, then due reviews, random within each group. */
   queue: protectedProcedure
     .input(z.object({ ...filters, limit: z.number().int().min(1).max(50).default(10) }).default({}))
     .query(async ({ ctx, input }): Promise<ExerciseDTO[]> => {
@@ -145,29 +147,20 @@ export const practiceRouter = createTRPCRouter({
         .where(
           and(
             ...ownerFilters(ctx.session.user.id, input),
-            // "Practicar esta partida": all of that game's exercises, due or not, in move order.
-            input.gameId ? undefined : lt(e.box, MASTERED_BOX),
-            input.gameId ? undefined : or(lte(e.dueAt, sql`now()`), eq(e.attempts, 0))
+            // "Practicar partida": all of that game's exercises, due or not, in move order.
+            input.gameId ? undefined : dueFilter
           )
         )
-        .orderBy(
-          ...(input.gameId
-            ? [asc(e.ply)]
-            : [sql`(${e.attempts} = 0)`, sql`case when ${e.attempts} > 0 then ${e.dueAt} end`, ...recentOrder])
-        )
+        .orderBy(...(input.gameId ? [asc(e.ply)] : [sql`(${e.box} = 0) desc`, sql`random()`]))
         .limit(input.limit);
       return rows.map((r) => toDTO(r, true));
     }),
 
-  /** Paged list of non-archived exercises (mastered included), most recent first (D4). */
+  /** Non-archived exercises (mastered included), most recent first, EXERCISES_PAGE per batch (D4, D12). */
   list: protectedProcedure
-    .input(z.object({ ...filters, page: z.number().int().min(1).default(1) }).default({}))
+    .input(z.object({ ...filters, cursor: cursorSchema }).default({}))
     .query(async ({ ctx, input }) => {
-      const where = and(...ownerFilters(ctx.session.user.id, input));
-      const [count] = await ctx.db.select({ total: sql<number>`count(*)::int` }).from(e).where(where);
-      const total = count?.total ?? 0;
-      // Out of range -> last page (page 1 when empty).
-      const page = Math.min(input.page, Math.max(1, Math.ceil(total / PAGE_SIZE)));
+      const offset = input.cursor ?? 0;
       const rows = await ctx.db
         .select({
           id: e.id,
@@ -176,26 +169,37 @@ export const practiceRouter = createTRPCRouter({
           sideToMove: e.color,
           white: games.white,
           black: games.black,
-          ply: e.ply,
           box: e.box,
           brilliantPlayed: e.brilliantPlayed,
         })
         .from(e)
         .innerJoin(games, eq(games.id, e.gameId))
-        .where(where)
+        .where(and(...ownerFilters(ctx.session.user.id, input)))
         .orderBy(...recentOrder)
-        .limit(PAGE_SIZE)
-        .offset((page - 1) * PAGE_SIZE);
+        .limit(EXERCISES_PAGE)
+        .offset(offset);
       return {
-        items: rows.map(({ ply, box, ...r }) => ({
+        items: rows.map(({ box, ...r }) => ({
           ...r,
-          moveNumber: Math.floor(ply / 2) + 1,
+          moveNumber: Number(r.fen.split(" ")[5]) || 1,
           mastered: box >= MASTERED_BOX,
         })),
-        total,
-        page,
-        pageSize: PAGE_SIZE,
+        nextCursor: rows.length === EXERCISES_PAGE ? offset + EXERCISES_PAGE : null,
       };
+    }),
+
+  /** Id after `id` in the list order with the same filters (D4); null if last or not in the list. */
+  next: protectedProcedure
+    .input(z.object({ id: z.string().uuid(), ...filters }))
+    .query(async ({ ctx, input }) => {
+      const o = ctx.db
+        .select({ id: e.id, nxt: sql<string | null>`lead(${e.id}) over (order by ${sql.join(recentOrder, sql`, `)})`.as("nxt") })
+        .from(e)
+        .innerJoin(games, eq(games.id, e.gameId))
+        .where(and(...ownerFilters(ctx.session.user.id, input)))
+        .as("o");
+      const [row] = await ctx.db.select({ nxt: o.nxt }).from(o).where(eq(o.id, input.id));
+      return { id: row?.nxt ?? null };
     }),
 
   /**
@@ -222,7 +226,7 @@ export const practiceRouter = createTRPCRouter({
     return { exercise: toDTO(row, owner), owner };
   }),
 
-  /** One call per exercise per session; the server computes the Leitner box (D9). */
+  /** One call per opened exercise; the server computes the streak box (D2). */
   submitResult: protectedProcedure
     .input(
       z.object({
@@ -237,30 +241,17 @@ export const practiceRouter = createTRPCRouter({
       await enforceRateLimit(ctx.db, `practice.submit:${userId}`, 120, 60);
       return ctx.db.transaction(async (tx) => {
         const [ex] = await tx
-          .select({ box: exercises.box, dueAt: exercises.dueAt, attempts: exercises.attempts })
+          .select({ box: exercises.box })
           .from(exercises)
           .where(and(eq(exercises.id, input.exerciseId), eq(exercises.userId, userId)))
           .for("update");
         if (!ex) throw notFound();
 
         const now = new Date();
-        const [recent] = await tx
-          .select({ id: exerciseAttempts.id })
-          .from(exerciseAttempts)
-          .where(
-            and(
-              eq(exerciseAttempts.exerciseId, input.exerciseId),
-              gt(exerciseAttempts.createdAt, new Date(now.getTime() - SESSION_REPEAT_MS))
-            )
-          )
-          .limit(1);
-
         const correct = input.firstTryCorrect && !input.usedHint && !input.viewedSolution;
-        // Recorded without moving the box: the in-session repeat of a failed exercise, and an attempted
-        // exercise that is not due yet (e.g. opened early from its link, D6).
-        const keep = !!recent || (ex.attempts > 0 && ex.dueAt > now);
-        const box = keep ? ex.box : nextBox(ex.box, correct);
-        const dueAt = keep ? ex.dueAt : dueAtFor(box, now);
+        // Every owner result counts (session, by game or by link, due or not) (D2).
+        const box = nextBox(ex.box, correct);
+        const dueAt = dueAtFor(box, now);
 
         await tx
           .update(exercises)
@@ -289,7 +280,7 @@ export const practiceRouter = createTRPCRouter({
     const [c] = await ctx.db
       .select({
         total: sql<number>`count(*)::int`,
-        due: sql<number>`(count(*) filter (where ${e.box} < ${MASTERED_BOX} and ${e.dueAt} <= now()))::int`,
+        due: sql<number>`(count(*) filter (where ${dueFilter}))::int`,
         mastered: sql<number>`(count(*) filter (where ${e.box} >= ${MASTERED_BOX}))::int`,
       })
       .from(e)

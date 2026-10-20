@@ -7,9 +7,9 @@ import { useState } from "react";
 import { AnalysisControls } from "~/components/analysis-controls";
 import { CLASSIFIER_VERSION } from "~/lib/classify/version";
 import { netError } from "~/components/pwa";
-import { GameReview } from "~/components/review";
+import { GameReview, REVIEW_ROW_BTN } from "~/components/review";
 import { useAnalysis } from "~/hooks/use-analysis";
-import type { GameAnalysis } from "~/lib/types";
+import type { Color, GameAnalysis } from "~/lib/types";
 import { api } from "~/trpc/react";
 
 export default function SavedGamePage() {
@@ -60,11 +60,12 @@ export default function SavedGamePage() {
 
   return (
     <>
-      <div className="mb-2 flex items-center gap-2">
-        <Link href="/partidas" className="btn-ghost -ml-2 px-2" aria-label="Volver a Mis partidas">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <Link href="/partidas" className="btn-ghost -ml-2 size-9 min-h-9 shrink-0 px-0" aria-label="Volver a Mis partidas">
           <ChevronLeft className="size-5" />
         </Link>
-        <h1 className="min-w-0 truncate text-base font-bold">
+        <ResultTag result={game.result} userColor={game.userColor} />
+        <h1 className="min-w-0 truncate text-sm font-bold">
           {game.white} vs {game.black}
           {game.openingName && <span className="ml-2 text-sm font-normal text-muted">{game.openingName}</span>}
         </h1>
@@ -75,8 +76,8 @@ export default function SavedGamePage() {
         liveEvals={state.status === "running" ? liveEvals : undefined}
         actions={
           q.data?.exerciseCount ? (
-            <Link href={`/practicar?partida=${id}&iniciar=1`} className="btn-primary">
-              <Puzzle className="size-4" /> Practicar esta partida
+            <Link href={`/practicar?partida=${id}&iniciar=1`} className={`btn-primary ${REVIEW_ROW_BTN}`}>
+              <Puzzle className="hidden size-4 sm:block" /> Practicar partida
             </Link>
           ) : null
         }
@@ -108,4 +109,20 @@ export default function SavedGamePage() {
       />
     </>
   );
+}
+
+/** "Ganaste/Perdiste/Tablas" con color conocido, "Ganan blancas/negras/Tablas" sin él; nada con "*" (D7). */
+function ResultTag({ result, userColor }: { result?: string | null; userColor: Color | null }) {
+  const winner: Color | "draw" | null =
+    result === "1-0" ? "w" : result === "0-1" ? "b" : result === "1/2-1/2" ? "draw" : null;
+  if (!winner) return null;
+  const [text, tone] =
+    winner === "draw"
+      ? ["Tablas", "bg-raised text-muted"]
+      : !userColor
+        ? [winner === "w" ? "Ganan blancas" : "Ganan negras", "bg-raised text-fg"]
+        : winner === userColor
+          ? ["Ganaste", "bg-c-best/20 text-c-best"]
+          : ["Perdiste", "bg-c-blunder/20 text-c-blunder"];
+  return <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${tone}`}>{text}</span>;
 }

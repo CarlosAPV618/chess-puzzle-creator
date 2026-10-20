@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test": "node --env-file-if-exists=.env --import tsx --test --test-concurrency=1 \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
+    "test": "node --env-file-if-exists=.env --import tsx --test --test-concurrency=3 \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
     "db:generate": "node --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs migrate",
     "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",

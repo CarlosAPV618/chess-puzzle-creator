@@ -7,7 +7,7 @@ export function MiniBoard({ fen, orientation = "white", className = "" }: { fen:
     <div
       role="img"
       aria-label={`Posición: ${fen.split(" ")[0]}`}
-      className={`grid aspect-square grid-cols-8 grid-rows-8 overflow-hidden rounded-md ${className}`}
+      className={`grid aspect-square grid-cols-8 grid-rows-8 overflow-hidden rounded-md select-none [-webkit-touch-callout:none] ${className}`}
     >
       {ordered.map(({ p, dark }, i) => (
         <div key={i} className={dark ? "bg-board-dark" : "bg-board-light"}>

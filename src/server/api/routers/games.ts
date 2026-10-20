@@ -4,10 +4,13 @@ import { z } from "zod";
 
 import { MAX_GAMES, parseGamePgn } from "~/lib/import/pgn";
 import type { Color, GameAnalysis } from "~/lib/types";
+import { cursorSchema } from "~/server/api/routers/practice";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { analyses, exercises, games, playerNames } from "~/server/db/schema";
 import { replayFens } from "~/server/services/analysis";
 import { enforceRateLimit } from "~/server/services/rate-limit";
+
+export const GAMES_PAGE = 30;
 
 const colorSchema = z.enum(["w", "b"]);
 const idInput = z.object({ id: z.string().uuid() });
@@ -81,7 +84,9 @@ export const gamesRouter = createTRPCRouter({
       };
     }),
 
-  list: protectedProcedure.query(async ({ ctx }) => {
+  /** GAMES_PAGE per batch, most recent first with a stable tiebreak (D4, D12). */
+  list: protectedProcedure.input(z.object({ cursor: cursorSchema }).default({})).query(async ({ ctx, input }) => {
+    const offset = input.cursor ?? 0;
     const rows = await ctx.db
       .select({
         id: games.id,
@@ -107,7 +112,9 @@ export const gamesRouter = createTRPCRouter({
       .from(games)
       .leftJoin(analyses, eq(analyses.gameId, games.id))
       .where(eq(games.userId, ctx.session.user.id))
-      .orderBy(sql`coalesce(${games.playedAt}, ${games.createdAt}) desc`, desc(games.createdAt));
+      .orderBy(sql`coalesce(${games.playedAt}, ${games.createdAt}) desc`, desc(games.createdAt), desc(games.id))
+      .limit(GAMES_PAGE)
+      .offset(offset);
 
     // Rows imported before migration 0002 have no final FEN: compute and store it once (D9).
     const missing = rows.filter((r) => r.finalFen === null).map((r) => r.id);
@@ -124,7 +131,7 @@ export const gamesRouter = createTRPCRouter({
       }
     }
 
-    return rows.map((r) => {
+    const items = rows.map((r) => {
       const pick = <T,>(w: T | null, b: T | null) => (r.userColor === "w" ? w : r.userColor === "b" ? b : null);
       return {
         id: r.id,
@@ -149,6 +156,7 @@ export const gamesRouter = createTRPCRouter({
         source: r.source,
       };
     });
+    return { items, nextCursor: rows.length === GAMES_PAGE ? offset + GAMES_PAGE : null };
   }),
 
   get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {

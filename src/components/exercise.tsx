@@ -4,11 +4,12 @@ import { ArrowLeft, ExternalLink, Lightbulb, RotateCcw, Sparkles } from "lucide-
 import Link from "next/link";
 import { useState } from "react";
 import { Board } from "~/components/board";
-import { applyUci, formatEval, prettySan, sanOf, uciFrom, uciTo } from "~/components/chess";
+import { applyUci, formatEval, moveLabel, prettySan, sanOf, uciFrom, uciTo } from "~/components/chess";
 import { ClassIcon } from "~/components/class-icon";
 import { EvalBar } from "~/components/eval-bar";
 import { NavBar } from "~/components/nav-bar";
 import { judgeMove } from "~/hooks/use-engine";
+import { MISS_WIN } from "~/lib/classify";
 import { CLASSIFICATIONS, type Classification, type Eval } from "~/lib/types";
 import type { RouterOutputs } from "~/trpc/react";
 
@@ -17,6 +18,20 @@ export type Outcome = { firstTryCorrect: boolean; usedHint: boolean; viewedSolut
 
 type Phase = "solve" | "checking" | "wrong" | "done";
 type Line = { label: string; fens: string[]; moves: string[] };
+
+const SIDES = { mias: "me", rivales: "opponent" } as const;
+
+/** Filtros de la URL (`?lado=`, `?partida=`), con la misma validación en la lista y en `/practicar/<id>`. */
+export function practiceFilters(params: URLSearchParams) {
+  const lado = params.get("lado");
+  const side = lado === "mias" || lado === "rivales" ? SIDES[lado] : undefined;
+  // `game` es el nombre viejo del parámetro; se acepta para no romper enlaces.
+  const gameId = params.get("partida") ?? params.get("game") ?? undefined;
+  const q = new URLSearchParams();
+  if (side) q.set("lado", lado!);
+  if (gameId) q.set("partida", gameId);
+  return { side, gameId, query: q.size ? `?${q}` : "" };
+}
 
 const asClass = (c: string): Classification => ((CLASSIFICATIONS as readonly string[]).includes(c) ? (c as Classification) : "blunder");
 
@@ -35,21 +50,21 @@ function lineFrom(label: string, fen: string, ucis: string[]): Line {
 
 /**
  * Un ejercicio (D6). `onResult` se llama una sola vez, en cuanto el resultado queda fijado
- * (acierto o solución vista); `onNext` muestra "Siguiente". `owner` decide si los textos dicen
- * "Jugaste" o el nombre del jugador.
+ * (acierto o solución vista); `onNext` muestra "Siguiente" y `nextLink` un enlace en su lugar
+ * (`/practicar/<id>`). `owner` decide si los textos dicen "Jugaste" o el nombre del jugador.
  */
 export function ExerciseView({
   ex,
   owner,
-  repeat = false,
   onResult,
   onNext,
+  nextLink,
 }: {
   ex: Exercise;
   owner: boolean;
-  repeat?: boolean;
   onResult?: (o: Outcome) => void;
   onNext?: () => void;
+  nextLink?: { href: string; label: string };
 }) {
   const [phase, setPhase] = useState<Phase>("solve");
   const [fen, setFen] = useState(ex.fen);
@@ -68,7 +83,6 @@ export function ExerciseView({
   const goodCls: Classification = strict ? "brilliant" : "best";
   const orientation = ex.sideToMove === "b" ? "black" : "white";
   const bestSan = prettySan(sanOf(ex.fen, ex.bestUci));
-  const playedSan = prettySan(sanOf(ex.fen, ex.playedUci));
   const originCls: Classification = ex.kind === "brilliant" ? "brilliant" : asClass(ex.cls);
   // Última jugada del rival solo en errores y oportunidades perdidas (D6).
   const opponentLast = ex.kind !== "brilliant" && ex.lastMoveUci ? ex.lastMoveUci : null;
@@ -83,7 +97,17 @@ export function ExerciseView({
     setFen(applyUci(ex.fen, uci) ?? ex.fen);
     setPhase("checking");
     try {
-      const v = await judgeMove({ startFen: ex.fen, movesBefore: [], uci, bestUci: ex.bestUci, accepted: ex.acceptedUci, strict });
+      const v = await judgeMove({
+        startFen: ex.fen,
+        movesBefore: [],
+        uci,
+        bestUci: ex.bestUci,
+        accepted: ex.acceptedUci,
+        strict,
+        // La jugada de la partida nunca vale; en una oportunidad perdida hay que conservar la ventaja (D1).
+        playedUci: ex.playedUci,
+        minPoints: ex.kind === "miss" && ex.brilliantPlayed === null ? MISS_WIN : undefined,
+      });
       if (v.correct) {
         setCorrect(true);
         setMsg(strict ? "¡Brillante!" : v.exact ? "¡Correcto!" : `Buena jugada; la del motor era ${bestSan}`);
@@ -130,7 +154,7 @@ export function ExerciseView({
       : ex.side === "opponent"
         ? "tu rival jugó"
         : `${ex.sideToMove === "w" ? "blancas" : "negras"} jugaron`;
-  const originSan = ex.kind === "brilliant" ? `${bestSan}!!` : playedSan;
+  const originSan = ex.kind === "brilliant" ? `${moveLabel(ex.fen, sanOf(ex.fen, ex.bestUci))}!!` : moveLabel(ex.fen, sanOf(ex.fen, ex.playedUci));
 
   // Tablero: en una línea, el paso actual; si no, la jugada del usuario con el icono de SU resultado.
   const showFen = line ? line.fens[step]! : fen;
@@ -177,7 +201,6 @@ export function ExerciseView({
             <span className="min-w-0 break-words">
               {ex.white} vs {ex.black} · {ex.sideToMove === "w" ? "Juegan blancas" : "Juegan negras"}
             </span>
-            {repeat && <span className="rounded bg-raised px-1.5 normal-case">Repaso</span>}
           </p>
           <p className="mt-2 text-lg font-bold">{phase === "solve" || phase === "checking" ? prompt : msg}</p>
           {phase === "checking" && <p className="mt-1 text-sm text-muted">Comprobando…</p>}
@@ -232,6 +255,11 @@ export function ExerciseView({
                     <button type="button" onClick={onNext} className="btn-primary">
                       Siguiente
                     </button>
+                  )}
+                  {nextLink && (
+                    <Link href={nextLink.href} className="btn-primary">
+                      {nextLink.label}
+                    </Link>
                   )}
                   {ex.gameId && (
                     <Link href={`/partidas/${ex.gameId}`} className="btn-ghost">

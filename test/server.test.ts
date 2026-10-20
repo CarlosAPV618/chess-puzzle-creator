@@ -5,13 +5,13 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, TransactionRollbackError } from "drizzle-orm";
 
 import { parsePgnText } from "~/lib/import/pgn";
 import type { GameAnalysis } from "~/lib/types";
 import { db } from "~/server/db";
 import { exerciseAttempts, exercises, games as gamesT, playerNames } from "~/server/db/schema";
-import { replayFens } from "~/server/services/analysis";
+import { buildExercises, replayFens } from "~/server/services/analysis";
 import { makeAnalysis, TEST_PGN } from "./helpers/analysis";
 
 let A: string; // owner
@@ -137,7 +137,7 @@ test("analysis.save generates exercises for both sides with the merge rule", asy
 
   const { analysis } = await callerFor(A).games.get({ id: gameId });
   assert.deepEqual(analysis, a);
-  const [listed] = await callerFor(A).games.list();
+  const [listed] = (await callerFor(A).games.list()).items;
   assert.equal(listed!.analyzed, true);
   assert.equal(listed!.accuracyUser, 80);
   assert.equal(listed!.mistakes, 2);
@@ -146,8 +146,23 @@ test("analysis.save generates exercises for both sides with the merge rule", asy
   assert.deepEqual([listed!.whiteElo, listed!.blackElo], [null, null]);
 });
 
+test("buildExercises: a miss only accepts the second line if it keeps MISS_WIN", () => {
+  const fens = replayFens(startFen, movesUci);
+  const game = { id: gameId, userId: A, userColor: "w" as const, movesUci };
+  const second = (cls: "miss" | "blunder", best: number, alt: number) => {
+    const a = makeAnalysis(startFen, movesUci, { 5: { class: cls, epLoss: 0.1 } });
+    // Black to move at ply 5: cp -150 -> EP 0.635, cp -110 -> EP 0.600 (< MISS_WIN), loss ~0.035.
+    a.positions[5]!.best!.eval = { cp: best };
+    a.positions[5]!.second!.eval = { cp: alt };
+    return buildExercises(game, fens, a).find((r) => r.ply === 5)!.acceptedUci.length;
+  };
+  assert.equal(second("miss", -150, -110), 1);
+  assert.equal(second("blunder", -150, -110), 2);
+  assert.equal(second("miss", -200, -190), 2);
+});
+
 test("reanalysis keeps progress, resets on changed answer, archives and un-archives", async () => {
-  await db.update(exercises).set({ box: 3 }).where(eq(exercises.gameId, gameId));
+  await db.update(exercises).set({ box: 2 }).where(eq(exercises.gameId, gameId));
 
   const changed = baseAnalysis();
   changed.positions[2]!.best!.uci = changed.positions[2]!.second!.uci; // ply 2: different answer
@@ -156,7 +171,7 @@ test("reanalysis keeps progress, resets on changed answer, archives and un-archi
   assert.equal(r.exercisesCreated, 0);
 
   let ex = await exByPly();
-  assert.equal(ex.get(0)!.box, 3, "same kind+best keeps the box");
+  assert.equal(ex.get(0)!.box, 2, "same kind+best keeps the box");
   assert.equal(ex.get(2)!.box, 0, "new answer resets the box");
   assert.ok(ex.get(2)!.dueAt.getTime() <= Date.now() + 1000);
   assert.ok(ex.get(5)!.archivedAt, "no longer qualifies -> archived");
@@ -167,7 +182,7 @@ test("reanalysis keeps progress, resets on changed answer, archives and un-archi
   await callerFor(A).analysis.save({ gameId, analysis: baseAnalysis() });
   ex = await exByPly();
   assert.equal(ex.get(5)!.archivedAt, null, "re-qualifies -> un-archived");
-  assert.equal(ex.get(5)!.box, 3, "un-archived with the same answer keeps progress");
+  assert.equal(ex.get(5)!.box, 2, "un-archived with the same answer keeps progress");
 });
 
 test("games.setUserColor recomputes exercise sides", async () => {
@@ -181,7 +196,7 @@ test("games.setUserColor recomputes exercise sides", async () => {
   await callerFor(A).games.setUserColor({ id: gameId, color: "w" });
 });
 
-test("Leitner transitions and the in-session repeat", async () => {
+test("streak: 3 clean solves in a row master it, any other result resets to 0 (D2)", async () => {
   const ex = await exByPly();
   const id = ex.get(0)!.id;
   const submit = (firstTryCorrect: boolean, extra: { usedHint?: boolean; viewedSolution?: boolean } = {}) =>
@@ -191,44 +206,44 @@ test("Leitner transitions and the in-session repeat", async () => {
       usedHint: extra.usedHint ?? false,
       viewedSolution: extra.viewedSolution ?? false,
     });
-  // Next session: attempts are older than the repeat window and the exercise is due again.
-  const newSession = async () => {
-    await db.update(exerciseAttempts).set({ createdAt: sql`created_at - interval '2 hours'` }).where(eq(exerciseAttempts.exerciseId, id));
-    await db.update(exercises).set({ dueAt: sql`now()` }).where(eq(exercises.id, id));
-  };
   const setBox = (box: number) => db.update(exercises).set({ box }).where(eq(exercises.id, id));
   const days = (iso: string) => Math.round((Date.parse(iso) - Date.now()) / 86_400_000) || 0;
+  const queued = async () => (await callerFor(A).practice.queue({ limit: 50 })).map((q) => q.id);
 
-  await setBox(2);
+  await setBox(0);
   let r = await submit(true);
-  assert.equal(r.box, 3);
-  assert.equal(days(r.dueAt), 7);
+  assert.deepEqual([r.box, days(r.dueAt), r.mastered], [1, 60, false]);
+  assert.ok(!(await queued()).includes(id), "box 1 not due yet -> not queued");
+  // Not due yet, still counts (opened from the list or by game).
+  r = await submit(true);
+  assert.deepEqual([r.box, days(r.dueAt), r.mastered], [2, 180, false]);
+  r = await submit(true);
+  assert.deepEqual([r.box, days(r.dueAt), r.mastered], [3, 180, true]);
+  assert.ok(!(await queued()).includes(id), "mastered leaves the queue");
 
-  await newSession();
+  // Failed from box 2: back to 0, due now, queued before a due review.
+  await setBox(2);
   r = await submit(false);
   assert.deepEqual([r.box, days(r.dueAt), r.mastered], [0, 0, false]);
-  // Failed exercise repeated at the end of the same session and solved: box unchanged.
-  r = await submit(true);
-  assert.equal(r.box, 0);
+  await db.update(exercises).set({ box: 1, dueAt: sql`now() - interval '1 day'` }).where(eq(exercises.id, ex.get(2)!.id));
+  const me = await callerFor(A).practice.queue({ side: "me" });
+  assert.equal(me[0]!.id, id, "failed (box 0) before due reviews");
+  assert.ok(me.some((q) => q.id === ex.get(2)!.id), "due review queued");
 
-  await newSession();
-  await setBox(1);
   r = await submit(true, { usedHint: true });
   assert.equal(r.box, 0, "hint -> box 0");
-
-  await newSession();
-  await setBox(4);
-  r = await submit(true);
-  assert.deepEqual([r.box, r.mastered], [5, true]);
-  const queue = await callerFor(A).practice.queue({ limit: 50 });
-  assert.ok(!queue.some((q) => q.id === id), "mastered leaves the queue");
+  r = await submit(true, { viewedSolution: true });
+  assert.equal(r.box, 0, "solution -> box 0");
+  for (let i = 0; i < 3; i++) r = await submit(true);
+  assert.deepEqual([r.box, r.mastered], [3, true]);
 
   const [row] = await db.select().from(exercises).where(eq(exercises.id, id));
-  assert.equal(row!.attempts, 5);
+  assert.deepEqual([row!.attempts, row!.solvedCount], [9, 6]);
 });
 
 test("practice.queue side filter and DTO", async () => {
   const opp = await callerFor(A).practice.queue({ side: "opponent" });
+  opp.sort((x, y) => x.ply - y.ply);
   assert.deepEqual(opp.map((e) => [e.ply, e.kind]), [[5, "miss"], [9, "miss"]]);
   const e = opp[0]!;
   assert.equal(e.sideToMove, "b");
@@ -261,7 +276,8 @@ test("cross-user ids -> NOT_FOUND, no session -> UNAUTHORIZED", async () => {
     b.practice.submitResult({ exerciseId: exId, firstTryCorrect: true, usedHint: false, viewedSolution: false }),
     code("NOT_FOUND")
   );
-  assert.deepEqual(await b.games.list(), []);
+  assert.deepEqual(await b.games.list(), { items: [], nextCursor: null });
+  assert.deepEqual(await b.practice.next({ id: exId }), { id: null });
   assert.deepEqual(await b.practice.queue(), []);
   assert.deepEqual(await b.practice.queue({ gameId }), []);
 
@@ -270,6 +286,8 @@ test("cross-user ids -> NOT_FOUND, no session -> UNAUTHORIZED", async () => {
   await assert.rejects(anon.practice.queue(), code("UNAUTHORIZED"));
   await assert.rejects(anon.players.list(), code("UNAUTHORIZED"));
   await assert.rejects(anon.practice.list(), code("UNAUTHORIZED"));
+  await assert.rejects(anon.practice.next({ id: exId }), code("UNAUTHORIZED"));
+  await assert.rejects(anon.players.accounts(), code("UNAUTHORIZED"));
 });
 
 test("migration 0002 moves old kinds to miss and a re-analysis keeps the box", async () => {
@@ -303,7 +321,7 @@ async function importOne(userId: string, pgn: string, userColor: "w" | "b" | nul
   return r.ids[0]!;
 }
 
-test("lists, queue order, byId and the not-due rule (second user)", async () => {
+test("lists, byId and a result before due (second user)", async () => {
   const C = await createUser();
   const g1 = await importOne(C, variant("g1aaaaaa", "2024.01.05"), "w");
   const g2 = await importOne(C, variant("g2aaaaaa", "2024.03.01"), "w");
@@ -321,16 +339,16 @@ test("lists, queue order, byId and the not-due rule (second user)", async () => 
 
   // games.list: most recent first, final FEN, lazily filled for old rows.
   await db.update(gamesT).set({ finalFen: null }).where(eq(gamesT.id, g1));
-  const listed = await c.games.list();
+  const listed = (await c.games.list()).items;
   assert.deepEqual(listed.map((g) => g.id), [g2, g3, g1]);
   const finalFen = replayFens(startFen, movesUci).at(-1)!;
   assert.ok(listed.every((g) => g.finalFen === finalFen));
   const [g1Row] = await db.select({ f: gamesT.finalFen }).from(gamesT).where(eq(gamesT.id, g1));
   assert.equal(g1Row!.f, finalFen, "filled once in the DB");
 
-  // practice.list: 12 per page, most recent game first then ply, clamp, filters.
+  // practice.list: most recent game first then ply, filters.
   const p1 = await c.practice.list({});
-  assert.deepEqual([p1.total, p1.page, p1.pageSize, p1.items.length], [15, 1, 12, 12]);
+  assert.deepEqual([p1.items.length, p1.nextCursor], [15, null]);
   const plies = [0, 2, 5, 9, 10];
   const gameOf = async (ids: string[]) => {
     const rows = await db.select({ id: exercises.id, gameId: exercises.gameId, ply: exercises.ply }).from(exercises).where(inArray(exercises.id, ids));
@@ -340,28 +358,16 @@ test("lists, queue order, byId and the not-due rule (second user)", async () => 
   assert.deepEqual(await gameOf(p1.items.map((i) => i.id)), [
     ...plies.map((p) => `2:${p}`),
     ...plies.map((p) => `3:${p}`),
-    "1:0",
-    "1:2",
+    ...plies.map((p) => `1:${p}`),
   ]);
   const item = p1.items[2]!;
   assert.deepEqual(
     [item.kind, item.sideToMove, item.white, item.black, item.moveNumber, item.mastered, item.brilliantPlayed],
     ["miss", "b", "Carlos_MX", "Rival", 3, false, null]
   );
-  const p2 = await c.practice.list({ page: 99 });
-  assert.deepEqual([p2.page, p2.items.length], [2, 3]);
-  const opp = await c.practice.list({ side: "opponent", page: 2 });
-  assert.deepEqual([opp.total, opp.page, opp.items.length], [6, 1, 6]);
-  assert.equal((await c.practice.list({ gameId: g3 })).total, 5);
-  assert.deepEqual(await callerFor(B).practice.list({ page: 3 }), { items: [], total: 0, page: 1, pageSize: 12 });
-
-  // queue: new ones from the most recent game first; attempted + due before them.
-  let q = await c.practice.queue({ limit: 3 });
-  assert.deepEqual(await gameOf(q.map((e) => e.id)), ["2:0", "2:2", "2:5"]);
-  const dueId = p1.items[11]!.id; // g1 ply 2
-  await db.update(exercises).set({ attempts: 1, dueAt: sql`now() - interval '1 day'` }).where(eq(exercises.id, dueId));
-  q = await c.practice.queue({ limit: 2 });
-  assert.deepEqual(q.map((e) => e.id), [dueId, p1.items[0]!.id]);
+  assert.equal((await c.practice.list({ side: "opponent" })).items.length, 6);
+  assert.equal((await c.practice.list({ gameId: g3 })).items.length, 5);
+  assert.deepEqual(await callerFor(B).practice.list({ cursor: 28 }), { items: [], nextCursor: null });
 
   // byId: owner gets everything; others (signed in or not) the reduced version.
   const exId = p1.items[2]!.id; // g2 ply 5
@@ -382,7 +388,7 @@ test("lists, queue order, byId and the not-due rule (second user)", async () => 
   );
   const archivedId = p1.items[3]!.id;
   await db.update(exercises).set({ archivedAt: sql`now()` }).where(eq(exercises.id, archivedId));
-  const deletedGameExId = p2.items[0]!.id; // g1
+  const deletedGameExId = p1.items[14]!.id; // g1
   await c.games.delete({ id: g1 });
   for (const id of ["123", "6f1c0c8e-1111-4a4a-9b9b-000000000000", archivedId, deletedGameExId]) {
     await assert.rejects(callerFor(null).practice.byId({ id }), (e: unknown) =>
@@ -390,11 +396,10 @@ test("lists, queue order, byId and the not-due rule (second user)", async () => 
     );
   }
 
-  // Not due yet (opened from the link): the attempt is recorded, the box and due_at stay (D6).
-  const dueAt = new Date(Date.now() + 3 * 86_400_000);
-  await db.update(exercises).set({ box: 2, attempts: 1, dueAt }).where(eq(exercises.id, exId));
+  // Not due yet (opened from the link): it counts too (D2).
+  await db.update(exercises).set({ box: 1, attempts: 1, dueAt: new Date(Date.now() + 3 * 86_400_000) }).where(eq(exercises.id, exId));
   const r = await c.practice.submitResult({ exerciseId: exId, firstTryCorrect: true, usedHint: false, viewedSolution: false });
-  assert.deepEqual([r.box, r.dueAt], [2, dueAt.toISOString()]);
+  assert.equal(r.box, 2);
   const [row] = await db.select().from(exercises).where(eq(exercises.id, exId));
   assert.deepEqual([row!.box, row!.attempts, row!.solvedCount], [2, 2, 1]);
 });
@@ -408,7 +413,7 @@ test("one exercise per position: the same game imported twice doesn't duplicate;
   await c.analysis.save({ gameId: g2, analysis: baseAnalysis() });
   assert.equal((await c.games.get({ id: g1 })).exerciseCount, 5);
   assert.equal((await c.games.get({ id: g2 })).exerciseCount, 0);
-  assert.equal((await c.practice.list({})).total, 5);
+  assert.equal((await c.practice.list({})).items.length, 5);
 
   // By game: all of them, mastered or not due included, in move order.
   await db.update(exercises).set({ box: 5, attempts: 3, dueAt: sql`now() + interval '9 days'` }).where(and(eq(exercises.gameId, g1), eq(exercises.ply, 5)));
@@ -438,7 +443,7 @@ test("games.setUserColor registers the name and colors the user's other games", 
   await callerFor(D).games.setUserColor({ id: x, color: "w" });
   const names = await db.select().from(playerNames).where(eq(playerNames.userId, D));
   assert.deepEqual(names.map((n) => n.nameLower), ["carlos_mx"]);
-  const colors = new Map((await callerFor(D).games.list()).map((g) => [g.id, g.userColor]));
+  const colors = new Map((await callerFor(D).games.list()).items.map((g) => [g.id, g.userColor]));
   assert.deepEqual([colors.get(x), colors.get(y), colors.get(z)], ["w", "b", null]);
   const sides = await db.select({ ply: exercises.ply, side: exercises.side }).from(exercises).where(eq(exercises.gameId, y));
   assert.deepEqual(
@@ -469,4 +474,191 @@ test("games.import rate limit: 10/min per user", async () => {
   const { games } = await parsePgnText(TEST_PGN);
   for (let i = 0; i < 10; i++) await callerFor(C).games.import({ games: [games[0]!] });
   await assert.rejects(callerFor(C).games.import({ games: [games[0]!] }), code("TOO_MANY_REQUESTS"));
+});
+
+const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+/** n games in ONE insert: same created_at, no played_at (the tiebreak case, D4). */
+async function seedGames(userId: string, n: number, extra: Partial<typeof gamesT.$inferInsert> = {}) {
+  const rows = Array.from({ length: n }, (_, i) => ({
+    userId,
+    source: "pgn" as const,
+    sourceId: `seed${i}_${Math.random().toString(36).slice(2)}`,
+    pgn: "*",
+    white: "W",
+    black: "B",
+    result: "*",
+    startFen: START,
+    movesUci: [],
+    movesSan: [],
+    finalFen: START,
+    ...extra,
+  }));
+  return (await db.insert(gamesT).values(rows).returning({ id: gamesT.id })).map((r) => r.id);
+}
+async function seedExercises(userId: string, gameId: string, n: number, extra: Partial<typeof exercises.$inferInsert> = {}, from = 0) {
+  const rows = Array.from({ length: n }, (_, i) => ({
+    userId,
+    gameId,
+    ply: from + i,
+    color: "w" as const,
+    fen: START,
+    playedUci: "e2e4",
+    kind: "mistake" as const,
+    bestUci: "d2d4",
+    acceptedUci: ["d2d4"],
+    refutationPv: [],
+    cls: "blunder",
+    epLoss: 0.3,
+    phase: "opening" as const,
+    ...extra,
+  }));
+  return (await db.insert(exercises).values(rows).returning({ id: exercises.id })).map((r) => r.id);
+}
+
+test("queue: new and failed first, then due reviews, random order; never mastered or not due", async () => {
+  const U = await createUser();
+  const [g] = await seedGames(U, 1);
+  const fresh = await seedExercises(U, g!, 14);
+  const failed = await seedExercises(U, g!, 1, { attempts: 2 }, 14);
+  const due = await seedExercises(U, g!, 2, { box: 1, attempts: 1, dueAt: new Date(Date.now() - 86_400_000) }, 15);
+  await seedExercises(U, g!, 1, { box: 1, attempts: 1, dueAt: new Date(Date.now() + 86_400_000) }, 17);
+  await seedExercises(U, g!, 1, { box: 2, attempts: 2, dueAt: new Date(Date.now() + 9 * 86_400_000) }, 18);
+  await seedExercises(U, g!, 1, { box: 3, attempts: 3, dueAt: new Date(Date.now() - 86_400_000) }, 19);
+  const c = callerFor(U);
+
+  const all = (await c.practice.queue({ limit: 50 })).map((q) => q.id);
+  assert.deepEqual(all.slice(0, 15).sort(), [...fresh, ...failed].sort());
+  assert.deepEqual(all.slice(15).sort(), [...due].sort());
+  const s = await c.practice.summary({ tz: "UTC" });
+  assert.deepEqual([s.dueToday, s.mastered, s.total], [17, 1, 20]);
+
+  const orders = new Set<string>();
+  for (let i = 0; i < 5; i++) orders.add((await c.practice.queue()).map((q) => q.id).join());
+  assert.ok(orders.size > 1, "two sessions don't always give the same order");
+  assert.equal((await c.practice.queue()).length, 10);
+});
+
+test("games.list and practice.list in batches, stable order; next walks the list", async () => {
+  const U = await createUser();
+  const ids = await seedGames(U, 75);
+  const c = callerFor(U);
+  const batches: string[][] = [];
+  let cursor: number | null = null;
+  do {
+    const r: { items: { id: string }[]; nextCursor: number | null } = await c.games.list({ cursor });
+    batches.push(r.items.map((g) => g.id));
+    cursor = r.nextCursor;
+  } while (cursor !== null);
+  assert.deepEqual(batches.map((b) => b.length), [30, 30, 15]);
+  assert.deepEqual(batches.flat(), [...ids].sort().reverse(), "same created_at, no played_at -> by id, no repeats");
+  assert.deepEqual((await c.games.list({ cursor: 0 })).items.map((g) => g.id), batches[0]);
+
+  const [g1, g2, g3] = ids.slice(0, 3);
+  await seedExercises(U, g1!, 20, { side: "me" });
+  await seedExercises(U, g2!, 20, { side: "opponent" });
+  await seedExercises(U, g3!, 20, { side: "me" });
+  const ex: string[][] = [];
+  cursor = null;
+  do {
+    const r: { items: { id: string }[]; nextCursor: number | null } = await c.practice.list({ cursor });
+    ex.push(r.items.map((e) => e.id));
+    cursor = r.nextCursor;
+  } while (cursor !== null);
+  assert.deepEqual(ex.map((b) => b.length), [28, 28, 4]);
+  const list = ex.flat();
+  const rows = await db.select({ id: exercises.id, gameId: exercises.gameId, ply: exercises.ply }).from(exercises).where(eq(exercises.userId, U));
+  const expected = rows.sort((a, b) => (a.gameId === b.gameId ? a.ply - b.ply : a.gameId < b.gameId ? 1 : -1)).map((r) => r.id);
+  assert.deepEqual(list, expected, "game id desc, then ply; no repeats");
+
+  const walk = async (filters: { side?: "me" | "opponent"; gameId?: string }, first: string) => {
+    const out = [first];
+    for (let id: string | null = first; ; ) {
+      id = (await c.practice.next({ id, ...filters })).id;
+      if (!id) return out;
+      assert.ok(!out.includes(id), "no cycles");
+      out.push(id);
+    }
+  };
+  assert.deepEqual(await walk({}, list[0]!), list);
+  const mine = [
+    ...(await c.practice.list({ side: "me" })).items,
+    ...(await c.practice.list({ side: "me", cursor: 28 })).items,
+  ].map((e) => e.id);
+  assert.equal(mine.length, 40);
+  assert.deepEqual(await walk({ side: "me" }, mine[0]!), mine);
+  const ofG2 = (await c.practice.list({ gameId: g2 })).items.map((e) => e.id);
+  assert.deepEqual(await walk({ gameId: g2 }, ofG2[0]!), ofG2);
+  assert.deepEqual(await c.practice.next({ id: ofG2[0]!, side: "me" }), { id: null }, "not in the filtered list");
+  assert.deepEqual(await callerFor(B).practice.next({ id: list[0]! }), { id: null }, "another user's id");
+});
+
+test("migration 0003 turns old Leitner boxes into streaks", async () => {
+  const U = await createUser();
+  const [g] = await seedGames(U, 1);
+  const [streak, failedLast, five, fresh, repeat] = await seedExercises(U, g!, 5);
+  const attempt = (exerciseId: string, daysAgo: number, clean: boolean) =>
+    db.insert(exerciseAttempts).values({
+      exerciseId,
+      userId: U,
+      firstTryCorrect: clean,
+      usedHint: false,
+      viewedSolution: false,
+      createdAt: sql`now() - make_interval(secs => ${daysAgo * 86_400})`,
+    });
+  const setBox = (id: string, box: number) => db.update(exercises).set({ box }).where(eq(exercises.id, id));
+  await setBox(streak!, 1);
+  for (const ago of [40, 30, 20, 10]) await attempt(streak!, ago, true);
+  await setBox(failedLast!, 2);
+  await attempt(failedLast!, 30, true);
+  await attempt(failedLast!, 20, true);
+  await attempt(failedLast!, 10, false); // not counted by the old "not due yet" rule
+  await setBox(five!, 5);
+  for (const ago of [50, 40, 30, 20, 10]) await attempt(five!, ago, true);
+  // In-session repeat: failed, then solved right after seeing it (the old rule kept box 0).
+  await attempt(repeat!, 1.01, false);
+  await attempt(repeat!, 1, true);
+
+  const migration = readFileSync(new URL("../drizzle/0003_streak_schedule.sql", import.meta.url), "utf8");
+  let rows: { id: string; box: number; days: number }[] = [];
+  // The migration touches every row: roll back to keep the other tests' data as it was.
+  await db
+    .transaction(async (tx) => {
+      await tx.execute(sql.raw(migration));
+      rows = await tx
+        .select({ id: exercises.id, box: exercises.box, days: sql<number>`round(extract(epoch from ${exercises.dueAt} - now()) / 86400)::int` })
+        .from(exercises)
+        .where(eq(exercises.userId, U));
+      tx.rollback();
+    })
+    .catch((e: unknown) => {
+      if (!(e instanceof TransactionRollbackError)) throw e;
+    });
+  const by = new Map(rows.map((r) => [r.id, [r.box, r.days]]));
+  assert.deepEqual(by.get(streak!), [1, 50]);
+  assert.deepEqual(by.get(failedLast!), [0, 0]);
+  assert.equal(by.get(five!)![0], 3);
+  assert.ok(by.get(five!)![1]! >= 170, "mastered: due far away");
+  assert.deepEqual(by.get(fresh!), [0, 0]);
+  assert.deepEqual(by.get(repeat!), [0, 0]);
+});
+
+test("players.accounts: most played name per platform (ties: most recent), case-insensitive", async () => {
+  const U = await createUser();
+  const at = (d: string) => new Date(`${d}T12:00:00Z`);
+  await seedGames(U, 1, { source: "lichess", white: "carlos_lich", userColor: "w", playedAt: at("2024-01-01") });
+  await seedGames(U, 1, { source: "chesscom", white: "CarlosAPV", userColor: "w", playedAt: at("2024-02-01") });
+  await seedGames(U, 1, { source: "chesscom", black: "carlosapv", userColor: "b", playedAt: at("2024-03-01") });
+  await seedGames(U, 1, { source: "chesscom", white: "hikaru", userColor: "w", playedAt: at("2024-05-01") });
+  await seedGames(U, 3, { source: "chesscom", white: "ghost", black: "ghost" }); // no color: ignored
+  await seedGames(U, 3, { source: "pgn", white: "pgnname", userColor: "w" }); // not a platform
+  const r = await callerFor(U).players.accounts();
+  assert.deepEqual(r.lichess, { name: "carlos_lich", at: at("2024-01-01") });
+  assert.equal(r.chesscom?.name.toLowerCase(), "carlosapv");
+  assert.deepEqual(r.chesscom?.at, at("2024-03-01"));
+
+  const T = await createUser();
+  await seedGames(T, 1, { source: "chesscom", white: "older", userColor: "w", playedAt: at("2024-01-01") });
+  await seedGames(T, 1, { source: "chesscom", white: "newer", userColor: "w", playedAt: at("2024-02-01") });
+  assert.deepEqual(await callerFor(T).players.accounts(), { lichess: null, chesscom: { name: "newer", at: at("2024-02-01") } });
+  assert.deepEqual(await callerFor(B).players.accounts(), { lichess: null, chesscom: null });
 });

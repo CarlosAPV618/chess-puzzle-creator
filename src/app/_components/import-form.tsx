@@ -2,7 +2,7 @@
 
 import { ChevronRight, ClipboardPaste, Link2, Loader2, UserSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { clearPending, setCurrentGame } from "~/components/game-store";
 import { netError } from "~/components/pwa";
 import { fetchChesscomGame, fetchChesscomUserGames } from "~/lib/import/chesscom";
@@ -27,6 +27,7 @@ export function ImportForm() {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const logged = !!session;
   const players = api.players.list.useQuery(undefined, { enabled: logged });
+  const accounts = api.players.accounts.useQuery(undefined, { enabled: logged });
   const addPlayer = api.players.add.useMutation();
   const importGames = api.games.import.useMutation();
 
@@ -36,6 +37,9 @@ export function ImportForm() {
   const [platform, setPlatform] = useState<"lichess" | "chesscom">("lichess");
   const [user, setUser] = useState("");
   const [max, setMax] = useState(20);
+  // Prellenado (D9): solo mientras el usuario no eligió pestaña ni editó el nombre.
+  const [tabTouched, setTabTouched] = useState(false);
+  const [userEdited, setUserEdited] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -43,6 +47,24 @@ export function ImportForm() {
   const [rows, setRows] = useState<Row[]>([]);
 
   const names = players.data ?? [];
+  const acc = accounts.data;
+
+  useEffect(() => {
+    if (!acc || tabTouched || userEdited || pgn || link) return;
+    const recent = (["lichess", "chesscom"] as const)
+      .filter((p) => acc[p])
+      .sort((a, b) => new Date(acc[b]!.at).getTime() - new Date(acc[a]!.at).getTime())[0];
+    if (!recent) return;
+    setTab("user");
+    setPlatform(recent);
+    setUser(acc[recent]!.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al llegar las cuentas
+  }, [acc]);
+
+  function choosePlatform(p: "lichess" | "chesscom") {
+    setPlatform(p);
+    if (!userEdited && acc) setUser(acc[p]?.name ?? "");
+  }
   // Sin sesión resuelta aún no se sabe si guardar o abrir en memoria: los botones esperan.
   const waiting = busy || sessionPending;
 
@@ -162,7 +184,10 @@ export function ImportForm() {
               role="tab"
               type="button"
               aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                setTab(t.id);
+                setTabTouched(true);
+              }}
               className={`flex min-h-12 items-center justify-center gap-2 text-sm font-semibold transition ${
                 tab === t.id ? "bg-raised text-fg shadow-[inset_0_-2px_0_var(--color-brand)]" : "text-muted hover:text-fg"
               }`}
@@ -210,7 +235,7 @@ export function ImportForm() {
                     type="button"
                     role="radio"
                     aria-checked={platform === p}
-                    onClick={() => setPlatform(p)}
+                    onClick={() => choosePlatform(p)}
                     className={`min-h-11 rounded-md text-sm font-semibold ${platform === p ? "bg-raised text-fg ring-1 ring-line" : "text-muted"}`}
                   >
                     {p === "lichess" ? "Lichess" : "Chess.com"}
@@ -221,7 +246,10 @@ export function ImportForm() {
                 <input
                   aria-label="Usuario"
                   value={user}
-                  onChange={(e) => setUser(e.target.value)}
+                  onChange={(e) => {
+                    setUser(e.target.value);
+                    setUserEdited(true);
+                  }}
                   autoCapitalize="none"
                   autoCorrect="off"
                   placeholder="Nombre de usuario"

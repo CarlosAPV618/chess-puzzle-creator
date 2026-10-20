@@ -3,7 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { Chess } from "chess.js";
 import { and, eq, isNull, ne, notInArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { expectedPoints, phaseOf } from "~/lib/classify";
+import { phaseOf } from "~/lib/classify";
+import { acceptsSecond } from "~/lib/engine/check-move";
 
 import {
   CLASSIFICATIONS,
@@ -131,7 +132,7 @@ export function buildExercises(
       bestUci = pos.best.uci;
       acceptedUci = [bestUci];
       const s = pos.second;
-      if (s && s.uci !== playedUci && s.uci !== bestUci && expectedPoints(pos.best.eval, color) - expectedPoints(s.eval, color) < 0.05) {
+      if (s && s.uci !== playedUci && s.uci !== bestUci && acceptsSecond(pos.best, s, color, kind === "miss")) {
         acceptedUci.push(s.uci);
       }
     } else return;

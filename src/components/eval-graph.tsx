@@ -1,28 +1,31 @@
 "use client";
 
 import { useRef } from "react";
-import type { Classification, Eval } from "~/lib/types";
-import { whiteShare } from "./chess";
+import type { Classification, Color, Eval } from "~/lib/types";
+import { turnOf, whiteShare } from "./chess";
 import { CLASS_META } from "./class-icon";
 
-const MARKED: Classification[] = ["brilliant", "great", "miss", "mistake", "blunder"];
+const MARKED: Classification[] = ["brilliant", "great", "inaccuracy", "miss", "mistake", "blunder"];
 
 /**
  * Gráfica de evaluación (desde blancas). `evals` tiene N+1 puntos; los que faltan
  * (análisis en curso) se dejan fuera. Con mouse, clic o arrastre lleva a esa jugada; en táctil solo un
  * toque (< 8 px, sin pointercancel), para que deslizar el dedo haga scroll de la página.
+ * Solo marca las jugadas de `markColor` (null: las de los dos bandos).
  */
 export function EvalGraph({
   evals,
   fens,
   classes,
   ply,
+  markColor,
   onSelect,
 }: {
   evals: (Eval | undefined)[];
   fens: string[];
   classes: (Classification | undefined)[];
   ply: number;
+  markColor: Color | null;
   onSelect: (ply: number) => void;
 }) {
   const ref = useRef<SVGSVGElement>(null);
@@ -81,7 +84,7 @@ export function EvalGraph({
         <line x1={x(ply)} x2={x(ply)} y1={0} y2={H} stroke="var(--color-brand)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
       </svg>
       {classes.map((c, i) =>
-        c && MARKED.includes(c) && evals[i + 1] ? (
+        c && MARKED.includes(c) && evals[i + 1] && (!markColor || turnOf(fens[i] ?? "") === markColor) ? (
           <span
             key={i}
             aria-hidden

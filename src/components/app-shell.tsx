@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, LogIn, LogOut, Puzzle, Swords, Upload, User, X } from "lucide-react";
+import { Download, LogIn, LogOut, Menu, Puzzle, Swords, Upload, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -39,48 +39,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="ml-auto">
-            <AccountMenu />
+            <AccountMenu path={path} />
           </div>
         </div>
       </header>
       <PwaBanners />
-      <main className="mx-auto w-full max-w-6xl px-3 pt-3 pb-24 sm:px-4 md:pb-10">{children}</main>
-      <nav
-        aria-label="Principal"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
-      >
-        <div className="grid h-16 grid-cols-3">
-          {NAV.map((n) => {
-            const active = n.match(path);
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${active ? "text-brand" : "text-muted"}`}
-              >
-                <n.icon className="size-5" />
-                {n.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <main className="mx-auto w-full max-w-6xl px-3 pt-3 pb-10 sm:px-4">{children}</main>
     </>
   );
 }
 
-function AccountMenu() {
+/** `≥ md`: avatar con menú de cuenta. `< md`: hamburguesa con cuenta, páginas, instalar y sesión (D6). */
+function AccountMenu({ path }: { path: string }) {
   const { data: session } = authClient.useSession();
   const install = useInstall();
   const [open, setOpen] = useState(false);
   const [iosHelp, setIosHelp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Atrás/adelante u otra navegación: el panel no se queda abierto en la página nueva.
+  useEffect(() => setOpen(false), [path]);
+
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+      if (e instanceof KeyboardEvent) {
+        if (e.key !== "Escape") return;
+        setOpen(false);
+        // Hay dos disparadores (hamburguesa y avatar); el oculto tiene offsetParent null.
+        [...(ref.current?.querySelectorAll<HTMLButtonElement>("button[aria-haspopup]") ?? [])]
+          .find((b) => b.offsetParent)
+          ?.focus();
+      } else if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
@@ -91,26 +81,55 @@ function AccountMenu() {
   }, [open]);
 
   const item = "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium hover:bg-raised";
+  const trigger = {
+    type: "button" as const,
+    "aria-expanded": open,
+    "aria-haspopup": "menu" as const,
+    onClick: () => setOpen(!open),
+  };
+  const avatar = (size: string) =>
+    session ? (
+      <span className="text-sm font-bold uppercase">{session.user.email.slice(0, 1)}</span>
+    ) : (
+      <User className={size} />
+    );
 
   return (
     <div ref={ref} className="relative">
+      <button {...trigger} aria-label="Menú" className="flex size-11 items-center justify-center rounded-lg hover:bg-raised md:hidden">
+        <Menu className="size-6" />
+      </button>
       <button
-        type="button"
+        {...trigger}
         aria-label="Cuenta"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen(!open)}
-        className="flex size-11 items-center justify-center rounded-full bg-raised ring-1 ring-line hover:bg-line"
+        className="hidden size-11 items-center justify-center rounded-full bg-raised ring-1 ring-line hover:bg-line md:flex"
       >
-        {session ? (
-          <span className="text-sm font-bold uppercase">{session.user.email.slice(0, 1)}</span>
-        ) : (
-          <User className="size-5" />
-        )}
+        {avatar("size-5")}
       </button>
       {open && (
         <div role="menu" className="card absolute right-0 mt-2 w-64 p-1.5 shadow-2xl">
-          {session && <p className="truncate px-3 py-2 text-xs text-muted">{session.user.email}</p>}
+          <div className="flex items-center gap-3 px-3 py-2 md:hidden">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-raised ring-1 ring-line">
+              {avatar("size-4")}
+            </span>
+            <span className="truncate text-sm text-muted">{session ? session.user.email : "Sin cuenta"}</span>
+          </div>
+          {session && <p className="hidden truncate px-3 py-2 text-xs text-muted md:block">{session.user.email}</p>}
+          <nav aria-label="Principal" className="border-y border-line/60 py-1 md:hidden">
+            {NAV.map((n) => (
+              <Link
+                key={n.href}
+                role="menuitem"
+                href={n.href}
+                aria-current={n.match(path) ? "page" : undefined}
+                // También en la página actual, donde `path` no cambia.
+                onClick={() => setOpen(false)}
+                className={`${item} ${n.match(path) ? "bg-raised text-brand" : ""}`}
+              >
+                <n.icon className="size-4" /> {n.label}
+              </Link>
+            ))}
+          </nav>
           {install.available && (
             <button
               type="button"
@@ -142,9 +161,6 @@ function AccountMenu() {
               <LogIn className="size-4" /> Iniciar sesión
             </Link>
           )}
-          <button type="button" aria-label="Cerrar menú" className={`${item} text-muted md:hidden`} onClick={() => setOpen(false)}>
-            <X className="size-4" /> Cerrar
-          </button>
         </div>
       )}
     </div>
