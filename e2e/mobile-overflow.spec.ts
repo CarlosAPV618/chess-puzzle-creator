@@ -78,7 +78,25 @@ test("mobile review and menu at 360 px", async ({ page }) => {
   await page.waitForTimeout(600); // smooth scroll of the strip
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
 
+  // (3b) While reviewing the row under the board is hidden, the panels fit above the bottom nav and the X exits.
+  // Measured at 360×800 (Galaxy A55), the size reported by users.
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: "Repasar" }).click();
+  await expect(page.getByRole("button", { name: "Girar tablero" })).toBeHidden();
+  const navTop = () => page.locator("div.fixed.bottom-0").evaluate((el) => el.getBoundingClientRect().top);
+  const bottom = (name: string) => page.getByRole("button", { name, exact: true }).evaluate((el) => el.getBoundingClientRect().bottom);
+  const pending = page.getByRole("button", { name: "Repasar" }); // the pending panel's button
+  await expect(pending).toBeVisible({ timeout: 20_000 });
+  expect(await bottom("Continuar"), "pending panel hidden behind the bottom nav").toBeLessThanOrEqual(await navTop());
+  await pending.click();
+  for (const name of ["Pista", "Ver solución", "Omitir"]) await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  expect(await bottom("Pista"), "trial buttons hidden behind the bottom nav").toBeLessThanOrEqual(await navTop());
+  await page.screenshot({ path: "test-results/review-trial.png" });
+  await page.getByRole("button", { name: "Salir del repaso" }).click();
+  await expect(page.getByRole("button", { name: "Girar tablero" })).toBeVisible();
+
   // (4) "Practicar" goes straight to the session.
   await row[1]!.click();
-  await expect(page.getByRole("progressbar", { name: "Progreso de la sesión" })).toBeVisible({ timeout: 30_000 }); // first compile of /practicar in next dev
+  await expect(page.getByRole("progressbar", { name: "Progreso de la sesión" })).toBeVisible({ timeout: 90_000 }); // first compile of /practicar in next dev
 });

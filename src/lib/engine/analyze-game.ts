@@ -52,8 +52,13 @@ export async function analyzeGame(
 
     const { moves, candidates } = classifyGame({ ...input, positions });
     const picked = pickCandidates(candidates, input.userColor);
+    // Verification depth follows the preset (Rapido 12 -> 16, Normal 16 -> 20, Profundo 22): a fixed 22 made
+    // the tail of a quick analysis take longer than all of its positions.
+    const verifyDepth = Math.min(VERIFY_DEPTH, opts.depth + 4);
+    // Announce the candidates up front so the bar does not sit at 100% during the first deep search.
+    if (picked.length) opts.onProgress?.(total, total + picked.length);
     for (const [k, c] of picked.entries()) {
-      applyVerdict(moves, c, await verify(engine, input, positions, c, signal));
+      applyVerdict(moves, c, await verify(engine, input, positions, c, verifyDepth, signal));
       opts.onProgress?.(total + k + 1, total + picked.length);
     }
 
@@ -78,13 +83,14 @@ async function verify(
   input: AnalyzeGameInput,
   positions: PositionAnalysis[],
   c: BrilliantCandidate,
+  depth: number,
   signal?: AbortSignal,
 ): Promise<{ exerciseEligible: boolean } | null> {
   const before = input.movesUci.slice(0, c.ply);
   const shallowBest = positions[c.ply]?.best?.eval;
   if (!shallowBest) return null;
   const deep = await engine.analyze(
-    { startFen: input.startFen, moves: before, depth: VERIFY_DEPTH, multipv: VERIFY_MULTIPV },
+    { startFen: input.startFen, moves: before, depth, multipv: VERIFY_MULTIPV },
     signal,
   );
   const base = { fen: replay(input.startFen, before).fen(), uci: c.uci, shallowBest, deep };
@@ -94,7 +100,7 @@ async function verify(
       {
         startFen: input.startFen,
         moves: [...before, c.uci],
-        depth: VERIFY_DEPTH - 2,
+        depth: depth - 2,
         multipv: 1,
         searchmoves: out.captures,
       },

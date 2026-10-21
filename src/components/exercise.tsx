@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ExternalLink, Lightbulb, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, Eye, Lightbulb, RotateCcw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Board } from "~/components/board";
@@ -198,21 +198,21 @@ export function ExerciseView({
               </button>
             </div>
           ) : (
-            <div className={`mt-4 flex gap-2 ${phase === "done" ? "flex-nowrap" : "flex-wrap"}`}>
+            <div className="mt-4 flex flex-nowrap gap-2">
               {phase === "wrong" && (
-                <button type="button" onClick={retry} className="btn-primary">
-                  <RotateCcw className="size-4" /> Reintentar
+                <button type="button" onClick={retry} aria-label="Reintentar" title="Reintentar" className={`btn-primary ${REVIEW_ROW_BTN}`}>
+                  <RotateCcw className="size-5" />
                 </button>
               )}
               {(phase === "solve" || phase === "wrong") && (
                 <>
                   {!hint && (
-                    <button type="button" onClick={() => setHint(true)} className="btn-secondary">
-                      <Lightbulb className="size-4" /> Pista
+                    <button type="button" onClick={() => setHint(true)} aria-label="Pista" title="Pista" className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                      <Lightbulb className="size-5" />
                     </button>
                   )}
-                  <button type="button" onClick={showSolution} className="btn-secondary">
-                    Ver solución
+                  <button type="button" onClick={showSolution} aria-label="Ver solución" title="Ver solución" className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                    <Eye className="size-5" />
                   </button>
                 </>
               )}

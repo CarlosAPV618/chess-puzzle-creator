@@ -1,6 +1,6 @@
 "use client";
 
-import { GraduationCap, Lightbulb, Play, RefreshCw, RotateCcw, Target, Undo2, X } from "lucide-react";
+import { Eye, GraduationCap, Lightbulb, Play, RefreshCw, RotateCcw, Target, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Arrow } from "react-chessboard";
 import type { Color, Eval, GameAnalysis } from "~/lib/types";
@@ -211,6 +211,8 @@ export function GameReview({
     setTrial(null);
   }
   const reviewSide = game.userColor ?? (orientation === "black" ? "b" : "w");
+  // Mientras el repaso avanza solo, la salida va en el veredicto; en pausa ya la lleva el aviso de pausa.
+  const closeVerdict = review && !review.finished && !review.paused ? exitReview : undefined;
 
   useEffect(() => {
     if (!review || review.finished || review.paused || review.pending !== null || trial || variant) return;
@@ -347,31 +349,26 @@ export function GameReview({
             </div>
           </div>
           {player(!topIsWhite)}
-          {/* Una sola fila desde 360 px (D7): Repasar/Salir → actions → Girar. */}
-          <div className="flex flex-nowrap gap-1.5">
-            {analysis &&
-              (review && !review.finished ? (
-                <button type="button" onClick={exitReview} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
-                  <X className="hidden size-4 sm:block" /> Salir del repaso
+          {/* Una sola fila desde 360 px (D7): Repasar → actions → Girar. Se oculta durante el repaso para que quepa el panel; se sale con la X del panel. */}
+          {!reviewing && (
+            <div className="flex flex-nowrap gap-1.5">
+              {analysis && !review && (
+                <button type="button" onClick={() => startReview(reviewSide)} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                  <GraduationCap className="size-4" /> Repasar
                 </button>
-              ) : (
-                !review && (
-                  <button type="button" onClick={() => startReview(reviewSide)} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
-                    <GraduationCap className="size-4" /> Repasar
-                  </button>
-                )
-              ))}
-            {actions}
-            <button
-              type="button"
-              aria-label="Girar tablero"
-              title="Girar tablero"
-              onClick={() => setFlipped(!flipped)}
-              className="btn-secondary size-11 shrink-0 px-0"
-            >
-              <RefreshCw className="size-4" />
-            </button>
-          </div>
+              )}
+              {actions}
+              <button
+                type="button"
+                aria-label="Girar tablero"
+                title="Girar tablero"
+                onClick={() => setFlipped(!flipped)}
+                className="btn-secondary size-11 shrink-0 px-0"
+              >
+                <RefreshCw className="size-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Panel */}
@@ -399,6 +396,7 @@ export function GameReview({
               }
               onSkip={() => setTrial({ ...trial, status: "skipped" })}
               onDone={finishTrial}
+              onClose={review ? exitReview : undefined}
             />
           ) : review?.finished ? (
             <div className="rounded-lg bg-panel p-4 text-center">
@@ -440,6 +438,7 @@ export function GameReview({
                 startTrial(m);
               }}
               onContinue={() => setReview({ ...review, pending: null, results: { ...review.results, [review.pending!]: null } })}
+              onClose={exitReview}
             />
           ) : inVariant ? (
             <div className="flex items-center justify-between gap-2 rounded-lg bg-panel p-3">
@@ -457,23 +456,26 @@ export function GameReview({
               bestSan={!reviewing && prevBest && prevBest.uci !== game.movesUci[prevMove] ? sanOf(fens[prevMove]!, prevBest.uci) : null}
               evalText={formatEval(evals[ply], fen)}
               onRetry={RETRY_CLASSES.includes(prevAnalysis.class) && !review ? () => startTrial(prevMove) : undefined}
+              onClose={closeVerdict}
             />
           ) : (
             // Mismo hueco en el ply 0 para que la gráfica no salte al pasar a la jugada 1.
             analysis &&
             ply === 0 && (
               <div className={VERDICT_BOX}>
-                <p className="truncate font-semibold text-muted">Posición inicial</p>
+                <p className="min-w-0 flex-1 truncate font-semibold text-muted">Posición inicial</p>
+                {closeVerdict && <CloseReview onClick={closeVerdict} />}
               </div>
             )
           )}
 
           {review?.paused && !review.finished && !trial && (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-brand/10 p-3 ring-2 ring-brand/70">
-              <span className="text-sm font-semibold">Repaso en pausa</span>
+            <div className="flex items-center gap-2 rounded-xl bg-brand/10 p-3 ring-2 ring-brand/70">
+              <span className="mr-auto text-sm font-semibold">Repaso en pausa</span>
               <button type="button" onClick={() => setReview({ ...review, paused: false })} className="btn-primary">
                 <Play className="size-4" /> Continuar repaso
               </button>
+              <CloseReview onClick={exitReview} />
             </div>
           )}
 
@@ -522,6 +524,7 @@ function MoveVerdict({
   bestSan,
   evalText,
   onRetry,
+  onClose,
 }: {
   /** "12. b5" */
   label: string;
@@ -529,6 +532,7 @@ function MoveVerdict({
   bestSan: string | null;
   evalText: string;
   onRetry?: () => void;
+  onClose?: () => void;
 }) {
   const meta = CLASS_META[cls];
   return (
@@ -544,10 +548,11 @@ function MoveVerdict({
         </p>
       </div>
       {onRetry && (
-        <button type="button" onClick={onRetry} className="btn-secondary shrink-0">
-          <RotateCcw className="size-4" /> Reintentar
+        <button type="button" onClick={onRetry} aria-label="Reintentar" title="Reintentar" className="btn-secondary size-11 shrink-0 px-0">
+          <RotateCcw className="size-5" />
         </button>
       )}
+      {onClose && <CloseReview onClick={onClose} />}
     </div>
   );
 }
@@ -561,6 +566,7 @@ function TrialPanel({
   onSolution,
   onSkip,
   onDone,
+  onClose,
 }: {
   trial: Trial;
   review: boolean;
@@ -570,38 +576,41 @@ function TrialPanel({
   onSolution: () => void;
   onSkip: () => void;
   onDone: (correct: boolean) => void;
+  /** Salir del repaso (solo con repaso activo). */
+  onClose?: () => void;
 }) {
   const s = trial.status;
-  const tone =
-    s === "correct" ? "bg-c-best/15 ring-c-best" : s === "wrong" ? "bg-c-blunder/15 ring-c-blunder" : "bg-brand/10 ring-brand";
-  // Mismo padding que el veredicto y los botones en una fila, para que el panel no crezca mucho más.
-  const btn = `${REVIEW_ROW_BTN} min-h-9`;
+  const solving = s === "idle" || s === "checking";
+  // Resolviendo: color primario. Fallo: fondo del panel, sin rojo (no es un error grave).
+  const tone = s === "correct" ? "bg-c-best/15 ring-2 ring-c-best" : solving ? "bg-brand text-[#10200c]" : "bg-panel";
+  const btn = `${REVIEW_ROW_BTN} min-h-10`;
   return (
-    <div className={`rounded-lg px-3 py-2.5 ring-2 ${tone}`} aria-live="polite">
-      <p className="flex items-center gap-2 font-semibold">
-        {(s === "idle" || s === "checking") && <Target className="size-5 shrink-0 text-brand" />}
-        <span className="min-w-0 truncate">{s === "idle" || s === "checking" ? prompt : (trial.msg ?? "Omitida")}</span>
-        {s === "checking" && <span className="shrink-0 text-sm font-normal text-muted">Comprobando…</span>}
-      </p>
-      <div className="mt-2 flex flex-nowrap gap-1.5">
+    <div className={`rounded-lg px-3 py-2.5 ${tone}`} aria-live="polite">
+      <div className="flex items-center gap-2 font-semibold">
+        {solving && <Lightbulb className="size-5 shrink-0" />}
+        <span className="min-w-0 flex-1 truncate">{solving ? prompt : (trial.msg ?? "Omitida")}</span>
+        {s === "checking" && <span className="shrink-0 text-sm font-normal opacity-75">Comprobando…</span>}
+        {onClose && <CloseReview onClick={onClose} onBrand={solving} />}
+      </div>
+      <div className="mt-3.5 flex flex-nowrap gap-1.5">
         {s === "wrong" && (
-          <button type="button" onClick={onRetry} className={`btn-primary ${btn}`}>
-            <RotateCcw className="hidden size-4 sm:block" /> Reintentar
+          <button type="button" onClick={onRetry} aria-label="Reintentar" title="Reintentar" className={`btn-primary ${btn}`}>
+            <RotateCcw className="size-5" />
           </button>
         )}
         {(s === "idle" || s === "wrong") && (
           <>
             {!trial.hint && (
-              <button type="button" onClick={onHint} className={`btn-secondary ${btn}`}>
-                <Lightbulb className="hidden size-4 sm:block" /> Pista
+              <button type="button" onClick={onHint} aria-label="Pista" title="Pista" className={`btn-secondary ${btn}`}>
+                <Lightbulb className="size-5" />
               </button>
             )}
-            <button type="button" onClick={onSolution} className={`btn-secondary ${btn}`}>
-              Ver solución
+            <button type="button" onClick={onSolution} aria-label="Ver solución" title="Ver solución" className={`btn-secondary ${btn}`}>
+              <Eye className="size-5" />
             </button>
             {review && (
-              <button type="button" onClick={onSkip} className={`btn-secondary ${btn}`}>
-                Omitir
+              <button type="button" onClick={onSkip} aria-label="Omitir" title="Omitir" className={`btn-secondary ${btn}`}>
+                <X className="size-5" />
               </button>
             )}
           </>
@@ -621,6 +630,21 @@ function TrialPanel({
   );
 }
 
+/** X de la esquina de los paneles del repaso: sale del repaso. */
+function CloseReview({ onClick, onBrand }: { onClick: () => void; onBrand?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Salir del repaso"
+      title="Salir del repaso"
+      className={`-mr-1 grid size-8 shrink-0 place-items-center rounded-md transition ${onBrand ? "hover:bg-black/10" : "text-muted hover:bg-raised hover:text-fg"}`}
+    >
+      <X className="size-5" />
+    </button>
+  );
+}
+
 function PendingPanel({
   label,
   cls,
@@ -628,6 +652,7 @@ function PendingPanel({
   brilliant,
   onReview,
   onContinue,
+  onClose,
 }: {
   /** "12. b5" */
   label: string;
@@ -636,25 +661,28 @@ function PendingPanel({
   brilliant: boolean;
   onReview: () => void;
   onContinue: () => void;
+  onClose: () => void;
 }) {
   const meta = CLASS_META[cls];
   return (
-    <div className="rounded-xl bg-brand/10 p-4 ring-2 ring-brand" aria-live="polite">
+    // Compacto como el panel del intento: en 360×800 debe caber entero sobre la barra de navegación.
+    <div className="rounded-lg bg-brand/10 px-3 py-2.5 ring-2 ring-brand" aria-live="polite">
       <div className="flex items-center gap-3">
-        <ClassIcon cls={cls} size={36} />
-        <div className="min-w-0">
-          <p className="text-lg font-bold">
+        <ClassIcon cls={cls} size={32} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-bold">
             {label} <span style={{ color: meta.color }}>{CLASS_PHRASE[cls]}</span>
           </p>
           <p className="truncate text-sm text-muted">{who}</p>
         </div>
+        <CloseReview onClick={onClose} />
       </div>
       {brilliant && <p className="mt-1 text-sm text-muted">Aquí había una jugada brillante.</p>}
-      <div className="mt-3 flex gap-2">
-        <button type="button" onClick={onReview} className="btn-primary flex-1">
+      <div className="mt-3.5 flex gap-2">
+        <button type="button" onClick={onReview} className="btn-primary min-h-10 flex-1">
           <Target className="size-4" /> Repasar
         </button>
-        <button type="button" onClick={onContinue} className="btn-secondary flex-1">
+        <button type="button" onClick={onContinue} className="btn-secondary min-h-10 flex-1">
           Continuar
         </button>
       </div>
