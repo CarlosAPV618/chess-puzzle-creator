@@ -52,13 +52,16 @@ export async function analyzeGame(
 
     const { moves, candidates } = classifyGame({ ...input, positions });
     const picked = pickCandidates(candidates, input.userColor);
-    // Verification depth follows the preset (Rapido 12 -> 16, Normal 16 -> 20, Profundo 22): a fixed 22 made
-    // the tail of a quick analysis take longer than all of its positions.
-    const verifyDepth = Math.min(VERIFY_DEPTH, opts.depth + 4);
+    // Two stages: a cheap filter at the preset depth + 4 (Rapido 12 -> 16) rejects most candidates, and only the
+    // survivors are confirmed at VERIFY_DEPTH, so a Brilliant still needs depth 22. The second search reuses the
+    // hash of the first one on the same position.
+    const filterDepth = Math.min(VERIFY_DEPTH, opts.depth + 4);
     // Announce the candidates up front so the bar does not sit at 100% during the first deep search.
     if (picked.length) opts.onProgress?.(total, total + picked.length);
     for (const [k, c] of picked.entries()) {
-      applyVerdict(moves, c, await verify(engine, input, positions, c, verifyDepth, signal));
+      let verdict = await verify(engine, input, positions, c, filterDepth, signal);
+      if (verdict && filterDepth < VERIFY_DEPTH) verdict = await verify(engine, input, positions, c, VERIFY_DEPTH, signal);
+      applyVerdict(moves, c, verdict);
       opts.onProgress?.(total + k + 1, total + picked.length);
     }
 

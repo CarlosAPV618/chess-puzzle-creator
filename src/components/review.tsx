@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, GraduationCap, Lightbulb, Play, RefreshCw, RotateCcw, Target, Undo2, X } from "lucide-react";
+import { Eye, GraduationCap, Lightbulb, Play, RefreshCw, RotateCcw, SkipForward, Target, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Arrow } from "react-chessboard";
 import type { Color, Eval, GameAnalysis } from "~/lib/types";
@@ -610,7 +610,7 @@ function TrialPanel({
             </button>
             {review && (
               <button type="button" onClick={onSkip} aria-label="Omitir" title="Omitir" className={`btn-secondary ${btn}`}>
-                <X className="size-5" />
+                <SkipForward className="size-5" />
               </button>
             )}
           </>

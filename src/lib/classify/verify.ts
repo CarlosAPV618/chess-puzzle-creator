@@ -9,7 +9,7 @@ import { PIECE_VALUES, boardPieces, getUnsafePieces } from "./piece-safety";
 import type { BrilliantCandidate } from "./index";
 
 export const MAX_CANDIDATES = 6;
-/** Ceiling; the actual depth is the preset + 4 (analyze-game.ts). */
+/** Confirmation depth; candidates are first filtered at the preset + 4 (analyze-game.ts). */
 export const VERIFY_DEPTH = 22;
 export const VERIFY_MULTIPV = 3;
 export const SUSTAIN_PLIES = 6;
@@ -27,7 +27,7 @@ export type VerifyInput = {
   uci: string;
   /** Best-line eval at the normal analysis depth (White POV). */
   shallowBest: Eval;
-  /** Deep search of the position before (preset depth + 4, at most 22; MultiPV 3). */
+  /** Deep search of the position before (filter at preset + 4, confirmation at 22; MultiPV 3). */
   deep: { lines: EngineLine[]; pv: string[] };
   /**
    * Eval (White POV) of the position after the candidate when the opponent is
