@@ -1,10 +1,11 @@
 "use client";
 
 import { Chess, type Square } from "chess.js";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Chessboard, type Arrow, type PieceRenderObject } from "react-chessboard";
 import type { Classification } from "~/lib/types";
 import { ClassIcon } from "./class-icon";
+import { moveSound, playSound, sanSound } from "./sound";
 
 export type BoardProps = {
   id?: string;
@@ -13,7 +14,8 @@ export type BoardProps = {
   /** Si existe, el usuario puede mover las piezas del bando al turno. */
   onMove?: (uci: string) => void;
   arrows?: Arrow[];
-  lastMove?: { from: string; to: string } | null;
+  /** Con `san` suena en cualquier cambio de posición (también al saltar); sin él, solo si la posición sale de jugarla. */
+  lastMove?: { from: string; to: string; san?: string } | null;
   badge?: { square: string; cls: Classification } | null;
   /** Casillas resaltadas (p. ej. la pista). */
   highlight?: string[];
@@ -51,6 +53,16 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
     setSelected(null);
     setMarks(new Set());
   }
+
+  const prevFen = useRef(fen);
+  useEffect(() => {
+    const prev = prevFen.current;
+    prevFen.current = fen;
+    if (prev === fen || !lastMove) return;
+    const s = lastMove.san ? sanSound(lastMove.san) : moveSound(prev, lastMove.from, lastMove.to, fen);
+    if (s) playSound(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar la posición
+  }, [fen]);
 
   const targets = useMemo(
     () => (chess && selected ? chess.moves({ square: selected as Square, verbose: true }).map((m) => m.to as string) : []),
@@ -99,7 +111,12 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
           darkSquareNotationStyle: { color: "var(--color-board-light)", fontWeight: 700 },
           allowDragging: !!onMove,
           canDragPiece: ({ square }) => !!onMove && !!square && ownPiece(square),
-          onPieceDrop: ({ sourceSquare, targetSquare }) => !!targetSquare && tryMove(sourceSquare, targetSquare),
+          onPieceDrop: ({ sourceSquare, targetSquare }) => {
+            if (!targetSquare || targetSquare === sourceSquare) return false;
+            if (tryMove(sourceSquare, targetSquare)) return true;
+            playSound("illegal");
+            return false;
+          },
           onSquareClick: ({ square }) => {
             if (!onMove) return;
             if (selected && targets.includes(square)) return void tryMove(selected, square);

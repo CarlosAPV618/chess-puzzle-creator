@@ -1,12 +1,13 @@
 "use client";
 
-import { Download, LogIn, LogOut, Menu, Puzzle, Swords, Upload, User } from "lucide-react";
+import { Download, LogIn, LogOut, Menu, Puzzle, Swords, Upload, User, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "~/server/better-auth/client";
 import { Logo } from "./logo";
 import { PwaBanners, useInstall } from "./pwa";
+import { setSoundOn, soundOn } from "./sound";
 
 const NAV = [
   { href: "/", label: "Importar", icon: Upload, match: (p: string) => p === "/" || p.startsWith("/analizar") },
@@ -55,6 +56,8 @@ function AccountMenu({ path }: { path: string }) {
   const install = useInstall();
   const [open, setOpen] = useState(false);
   const [iosHelp, setIosHelp] = useState(false);
+  // El menú solo se pinta abierto en el cliente, así que leer localStorage aquí no desajusta la hidratación.
+  const [sound, setSound] = useState(soundOn);
   const ref = useRef<HTMLDivElement>(null);
 
   // Atrás/adelante u otra navegación: el panel no se queda abierto en la página nueva.
@@ -140,6 +143,18 @@ function AccountMenu({ path }: { path: string }) {
               <Download className="size-4" /> Instalar app
             </button>
           )}
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={sound}
+            className={item}
+            onClick={() => {
+              setSoundOn(!sound);
+              setSound(!sound);
+            }}
+          >
+            {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Sonido {sound ? "activado" : "desactivado"}
+          </button>
           {iosHelp && install.ios && (
             <p className="px-3 pb-2 text-xs text-muted">En Safari: Compartir → Agregar a pantalla de inicio.</p>
           )}

@@ -13,6 +13,7 @@ import { EvalBar } from "./eval-bar";
 import { EvalGraph } from "./eval-graph";
 import { MoveList } from "./move-list";
 import { NavBar } from "./nav-bar";
+import { playSound } from "./sound";
 import { Summary } from "./summary";
 
 export type ReviewGame = {
@@ -226,7 +227,7 @@ export function GameReview({
       setReview({ ...review, finished: true });
       return;
     }
-    const t = setTimeout(() => setPly((p) => Math.min(N, p + 1)), 650);
+    const t = setTimeout(() => setPly((p) => Math.min(N, p + 1)), 540);
     return () => clearTimeout(t);
   }, [review, trial, variant, ply, N]);
 
@@ -242,7 +243,10 @@ export function GameReview({
     : inVariant
       ? variant.moves[variant.moves.length - 1]
       : game.movesUci[ply - 1];
-  const lastMove = lastMoveUci ? { from: uciFrom(lastMoveUci), to: uciTo(lastMoveUci) } : null;
+  // En la partida (no intento ni variante) va la SAN: así también suena al saltar de posición.
+  const lastMove = lastMoveUci
+    ? { from: uciFrom(lastMoveUci), to: uciTo(lastMoveUci), san: trial || inVariant ? undefined : sans[ply - 1] }
+    : null;
 
   const prevMove = ply - 1;
   const prevAnalysis = !trial && !inVariant && prevMove >= 0 ? analysis?.moves[prevMove] : undefined;
@@ -281,6 +285,20 @@ export function GameReview({
 
   // Rueda del mouse sobre el tablero: abajo avanza, arriba retrocede (como chess.com y Lichess).
   const boardRef = useRef<HTMLDivElement>(null);
+  // Inicio al abrir la partida. Fin una sola vez, al llegar a la última jugada avanzando de una en una
+  // (no al saltar al final), tras el sonido de la jugada.
+  useEffect(() => playSound("game-start"), []);
+  const prevPly = useRef(ply);
+  const endPlayed = useRef(false);
+  useEffect(() => {
+    const arrived = ply === N && prevPly.current === N - 1;
+    prevPly.current = ply;
+    if (!arrived || trial || inVariant || endPlayed.current) return;
+    endPlayed.current = true;
+    const t = setTimeout(() => playSound("game-end"), 220);
+    return () => clearTimeout(t);
+  }, [ply, N, trial, inVariant]);
+
   const stepRef = useRef<(d: number) => void>(() => undefined);
   stepRef.current = (d) => {
     if (!trial) goto(ply + d);
@@ -587,7 +605,6 @@ function TrialPanel({
   return (
     <div className={`rounded-lg px-3 py-2.5 ${tone}`} aria-live="polite">
       <div className="flex items-center gap-2 font-semibold">
-        {solving && <Lightbulb className="size-5 shrink-0" />}
         <span className="min-w-0 flex-1 truncate">{solving ? prompt : (trial.msg ?? "Omitida")}</span>
         {s === "checking" && <span className="shrink-0 text-sm font-normal opacity-75">Comprobando…</span>}
         {onClose && <CloseReview onClick={onClose} onBrand={solving} />}

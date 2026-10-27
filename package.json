@@ -15,7 +15,8 @@
     "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
     "db:test:up": "docker compose up -d",
     "reset-password": "node --env-file-if-exists=.env --import tsx scripts/reset-password.ts",
-    "build:openings": "node --import tsx scripts/build-openings.ts"
+    "build:openings": "node --import tsx scripts/build-openings.ts",
+    "build:sounds": "node --import tsx scripts/build-sounds.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.13",
