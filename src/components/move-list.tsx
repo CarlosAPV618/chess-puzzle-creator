@@ -27,7 +27,8 @@ export function MoveList({
   startsWithBlack?: boolean;
   startMoveNumber?: number;
   scrub?: boolean;
-  onSelect: (ply: number) => void;
+  /** `scrubbed`: elegida deslizando la franja (sin sonido). */
+  onSelect: (ply: number, scrubbed?: boolean) => void;
 }) {
   const ref = useRef<HTMLOListElement>(null);
   // Desplazamiento nuestro en curso: su scroll no elige jugada hasta que el usuario toque la franja
@@ -77,7 +78,7 @@ export function MoveList({
     const p = Number(best?.dataset.ply);
     if (best && p !== ply) {
       scrubbed.current = p;
-      onSelect(p);
+      onSelect(p, true);
     }
   }
 

@@ -19,6 +19,8 @@ export type BoardProps = {
   badge?: { square: string; cls: Classification } | null;
   /** Casillas resaltadas (p. ej. la pista). */
   highlight?: string[];
+  /** Sin sonido en este cambio de posición. */
+  silent?: boolean;
 };
 
 // Set cburnett de Lichess (Colin M.L. Burnett, GPLv2+), SVG vectorial nítido a cualquier tamaño.
@@ -35,7 +37,7 @@ const HINT: CSSProperties = { boxShadow: "inset 0 0 0 4px #1fb5ad", background: 
 /** Casilla marcada con clic derecho (D7), como lichess. */
 const MARK: CSSProperties = { background: "rgba(235, 97, 80, 0.8)" };
 
-export function Board({ id = "board", fen, orientation, onMove, arrows = [], lastMove, badge, highlight = [] }: BoardProps) {
+export function Board({ id = "board", fen, orientation, onMove, arrows = [], lastMove, badge, highlight = [], silent }: BoardProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [marks, setMarks] = useState<ReadonlySet<string>>(new Set());
   const chess = useMemo(() => {
@@ -58,7 +60,7 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
   useEffect(() => {
     const prev = prevFen.current;
     prevFen.current = fen;
-    if (prev === fen || !lastMove) return;
+    if (prev === fen || !lastMove || silent) return;
     const s = lastMove.san ? sanSound(lastMove.san) : moveSound(prev, lastMove.from, lastMove.to, fen);
     if (s) playSound(s);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar la posición

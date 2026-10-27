@@ -94,6 +94,8 @@ export function GameReview({
   const [variantInfo, setVariantInfo] = useState<{ eval?: Eval; best?: string }>({});
   const [trial, setTrial] = useState<Trial | null>(null);
   const [review, setReview] = useState<ReviewMode | null>(null);
+  // Jugada elegida deslizando la franja: no suena, para no saturar al deslizar rápido.
+  const [scrubbedPly, setScrubbedPly] = useState<number | null>(null);
 
   const baseOrientation = game.userColor === "b" ? "black" : "white";
   const orientation = flipped ? (baseOrientation === "white" ? "black" : "white") : baseOrientation;
@@ -336,7 +338,10 @@ export function GameReview({
       startsWithBlack={firstColor === "b"}
       startMoveNumber={Number(game.startFen.split(" ")[5] ?? 1)}
       scrub={scrub}
-      onSelect={goto}
+      onSelect={(p, scrubbed) => {
+        setScrubbedPly(scrubbed ? p : null);
+        goto(p);
+      }}
     />
   );
 
@@ -361,6 +366,7 @@ export function GameReview({
                 onMove={canMove ? onMove : undefined}
                 arrows={arrows}
                 lastMove={lastMove}
+                silent={scrubbedPly === ply && !trial && !inVariant}
                 badge={badge}
                 highlight={trial?.hint && pos?.best ? [uciFrom(pos.best.uci)] : []}
               />
