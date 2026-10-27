@@ -287,20 +287,6 @@ export function GameReview({
 
   // Rueda del mouse sobre el tablero: abajo avanza, arriba retrocede (como chess.com y Lichess).
   const boardRef = useRef<HTMLDivElement>(null);
-  // Inicio al abrir la partida. Fin una sola vez, al llegar a la última jugada avanzando de una en una
-  // (no al saltar al final), tras el sonido de la jugada.
-  useEffect(() => playSound("game-start"), []);
-  const prevPly = useRef(ply);
-  const endPlayed = useRef(false);
-  useEffect(() => {
-    const arrived = ply === N && prevPly.current === N - 1;
-    prevPly.current = ply;
-    if (!arrived || trial || inVariant || endPlayed.current) return;
-    endPlayed.current = true;
-    const t = setTimeout(() => playSound("game-end"), 220);
-    return () => clearTimeout(t);
-  }, [ply, N, trial, inVariant]);
-
   const stepRef = useRef<(d: number) => void>(() => undefined);
   stepRef.current = (d) => {
     if (!trial) goto(ply + d);

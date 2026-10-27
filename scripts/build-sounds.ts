@@ -42,20 +42,6 @@ function thock(
   }
 }
 
-// Tono suave con un leve barrido de tono hacia arriba, que recuerda a una gota sin imitarla.
-// from/to = frecuencia inicial/final (Hz), decay = caída del volumen (s).
-function drop(buf: Float32Array, atMs: number, { gain = 1, from = 400, to = 560, decay = 0.09 } = {}) {
-  const start = Math.floor((SR * atMs) / 1000);
-  let phase = 0;
-  for (let i = 0; start + i < buf.length; i++) {
-    const t = i / SR;
-    const env = Math.min(1, t / 0.004) * Math.exp(-t / decay);
-    if (t > 0.01 && env < 1e-4) break;
-    phase += (2 * Math.PI * (to + (from - to) * Math.exp(-t / 0.025))) / SR;
-    buf[start + i]! += gain * env * Math.sin(phase);
-  }
-}
-
 // Golpecito de ficha dura (resina/cerámica): parciales inarmónicos que se apagan muy rápido,
 // así suena a material y no a nota musical.
 function ping(buf: Float32Array, atMs: number, { gain = 0.4, freq = 1300, decay = 0.03 } = {}) {
@@ -141,20 +127,6 @@ const sounds: Record<string, () => Float32Array> = {
     const b = buffer(200);
     thock(b, 0, { gain: 0.7, body: 130, ring: 0.03, knock: 0.45, center: 800 });
     thock(b, 70, { body: 175, ring: 0.025, knock: 0.7, center: 1200 });
-    return b;
-  },
-  // Dos "gotas" que suben.
-  "game-start": () => {
-    const b = buffer(400);
-    drop(b, 0, { gain: 0.8, from: 330, to: 440 });
-    drop(b, 110, { from: 440, to: 590, decay: 0.11 });
-    return b;
-  },
-  // Dos "gotas" que bajan; la última más larga, como cierre.
-  "game-end": () => {
-    const b = buffer(450);
-    drop(b, 0, { from: 440, to: 590 });
-    drop(b, 120, { gain: 0.9, from: 300, to: 400, decay: 0.13 });
     return b;
   },
   // "rrrr": ráfaga de toques sordos muy seguidos que se apaga.

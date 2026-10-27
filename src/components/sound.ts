@@ -1,7 +1,7 @@
 // Sonidos del tablero (public/sounds, generados con `pnpm build:sounds`).
 import { Chess } from "chess.js";
 
-export type Sound = "move" | "capture" | "check" | "castle" | "promote" | "game-start" | "game-end" | "illegal";
+export type Sound = "move" | "capture" | "check" | "castle" | "promote" | "illegal";
 
 const KEY = "cpc:sound";
 const cache = new Map<Sound, HTMLAudioElement>();
