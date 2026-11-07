@@ -62,6 +62,8 @@ export default function SavedGamePage() {
 
   return (
     <GameReview
+      // Otra `?posicion=` sobre la misma partida (atrás/adelante) vuelve a montar el visor en esa posición.
+      key={pos ?? ""}
       game={game}
       analysis={analysis}
       initialPly={pos && /^\d+$/.test(pos) ? Number(pos) : undefined}

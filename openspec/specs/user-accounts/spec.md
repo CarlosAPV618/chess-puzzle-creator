@@ -4,7 +4,7 @@
 TBD - created by archiving change add-chess-analyzer. Update Purpose after archive.
 ## Requirements
 ### Requirement: Registro con correo y contraseña sin verificación
-El sistema SHALL permitir crear una cuenta con correo y contraseña (mínimo 8 caracteres) mediante Better Auth, sin verificar el correo. La sesión SHALL quedar activa al registrarse. La cookie SHALL ser `Secure` cuando `BETTER_AUTH_URL` es https.
+El sistema SHALL permitir crear una cuenta con correo y contraseña (mínimo 8 caracteres) mediante Better Auth, sin verificar el correo. La sesión SHALL quedar activa al registrarse. La cookie SHALL ser `Secure` cuando `BETTER_AUTH_URL` es https. La sesión SHALL durar 60 días y renovarse (también la cookie) al usar la app, como mucho una vez al día, de modo que un usuario activo no tenga que volver a iniciar sesión.
 
 #### Scenario: Registro exitoso
 - **WHEN** un visitante se registra con `x@noexiste.test` y una contraseña de 8 caracteres

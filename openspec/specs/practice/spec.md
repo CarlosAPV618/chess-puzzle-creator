@@ -134,7 +134,7 @@ La misma regla SHALL aplicarse en "Reintentar" y en "Repasar partida", con la ju
 - **THEN** se marca incorrecta y se ofrecen "Reintentar", "Pista" y "Ver solución"
 
 ### Requirement: Explicar el error
-Después de cada respuesta, el sistema SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en una sola fila y en este orden: "Mejor línea", "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente) y "Ver partida" (solo el dueño). No SHALL haber "Lo que podía pasar" ni un recuadro con la jugada original de la partida.
+Después de cada respuesta, el sistema SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en una sola fila y en este orden: "Mejor línea", "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente) y "Ver partida" (solo el dueño). "Ver partida" SHALL estar visible en todas las fases del ejercicio (también antes de responder) y SHALL abrir la partida en la posición del ejercicio (`/partidas/<id>?posicion=<ply>`). No SHALL haber "Lo que podía pasar" ni un recuadro con la jugada original de la partida.
 
 Tras la respuesta, el tablero SHALL quedarse en la jugada del usuario con el icono de su resultado:
 - si es correcta, el icono de Mejor (o de Brillante en `brilliant`);
@@ -260,7 +260,7 @@ Tocar una tarjeta SHALL abrir el ejercicio en `/practicar/<id>`, conservando los
 ### Requirement: Ejercicio por URL
 Cada ejercicio SHALL poder abrirse en `/practicar/<id>` y tener un botón "Compartir" con dos opciones:
 - **Enlace:** Web Share API con la URL, o copiarla si no está disponible.
-- **Imagen:** un PNG de la posición, orientado al bando que mueve, con coordenadas y la leyenda "Juegan blancas" o "Juegan negras", y nada más. Sin nombres, evaluación, última jugada ni URL.
+- **Imagen:** un PNG con el logo y el nombre de la app centrados arriba, la posición con un margen pequeño a los lados, orientada al bando que mueve, con coordenadas y la leyenda "Juegan blancas" o "Juegan negras", y nada más. Sin nombres, evaluación, última jugada ni URL.
   - En un dispositivo táctil que puede compartir archivos, SHALL abrirse la hoja nativa de compartir.
   - En los demás casos (escritorio, o si compartir falla), SHALL descargarse `ejercicio.png`.
   - Si la imagen no puede generarse, SHALL decirlo, y "Enlace" sigue disponible.
