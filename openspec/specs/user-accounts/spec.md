@@ -86,11 +86,15 @@ El sistema SHALL permitir importar por PGN o link y analizar sin sesión. Guarda
 - **THEN** la partida y su análisis se guardan en su cuenta sin volver a analizar
 
 ### Requirement: Aislamiento de datos por usuario
-Todo procedimiento que lea o modifique partidas, análisis, ejercicios o intentos SHALL verificar la sesión en el servidor y SHALL filtrar por el `user_id` de la sesión. La redirección de `middleware.ts` no cuenta como verificación.
+Todo procedimiento que lea o modifique partidas, análisis, ejercicios o intentos SHALL verificar la sesión en el servidor y SHALL filtrar por el `user_id` de la sesión. La redirección de `middleware.ts` no cuenta como verificación. Excepción: ver una partida (`/partidas/<id>`, con su análisis) o un ejercicio (`/practicar/<id>`) por su id es público, sin sesión; solo el dueño ve los datos de su cuenta (conteo de ejercicios, caja, resultado) y puede modificarlos.
 
 #### Scenario: Acceso a recurso ajeno
-- **WHEN** un usuario pide la partida o el ejercicio con un id que pertenece a otro usuario
+- **WHEN** un usuario pide modificar la partida o el ejercicio con un id que pertenece a otro usuario
 - **THEN** el servidor responde NOT_FOUND y no revela que existe
+
+#### Scenario: Partida pública
+- **WHEN** otro usuario o un visitante sin sesión abre `/partidas/<id>`
+- **THEN** ve la partida y su análisis, sin analizar, guardar, practicar ni volver a "Mis partidas"
 
 #### Scenario: Sin sesión
 - **WHEN** se llama un procedimiento protegido sin sesión válida

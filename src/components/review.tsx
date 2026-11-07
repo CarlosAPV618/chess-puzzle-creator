@@ -71,6 +71,7 @@ export function GameReview({
   actions,
   back,
   initialPly,
+  onPly,
 }: {
   game: ReviewGame;
   analysis: GameAnalysis | null;
@@ -84,6 +85,8 @@ export function GameReview({
   back?: ReactNode;
   /** Posición inicial (`?posicion=` en la URL); si no, la primera jugada. */
   initialPly?: number;
+  /** Cada cambio de jugada de la partida (no en variantes ni en el intento del repaso). */
+  onPly?: (ply: number) => void;
 }) {
   const { fens, sans } = useMemo(() => replay(game.startFen, game.movesUci), [game.startFen, game.movesUci]);
   const N = game.movesUci.length;
@@ -99,6 +102,12 @@ export function GameReview({
   const [review, setReview] = useState<ReviewMode | null>(null);
   // Jugada elegida deslizando la franja: no suena, para no saturar al deslizar rápido.
   const [scrubbedPly, setScrubbedPly] = useState<number | null>(null);
+
+  const onPlyRef = useRef(onPly);
+  onPlyRef.current = onPly;
+  useEffect(() => {
+    onPlyRef.current?.(ply);
+  }, [ply]);
 
   const baseOrientation = game.userColor === "b" ? "black" : "white";
   const orientation = flipped ? (baseOrientation === "white" ? "black" : "white") : baseOrientation;

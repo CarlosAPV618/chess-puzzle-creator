@@ -268,7 +268,14 @@ test("practice.summary", async () => {
 test("cross-user ids -> NOT_FOUND, no session -> UNAUTHORIZED", async () => {
   const exId = (await exByPly()).get(2)!.id;
   const b = callerFor(B);
-  await assert.rejects(b.games.get({ id: gameId }), code("NOT_FOUND"));
+  // Las partidas son públicas: otro usuario o un anónimo la ven, sin datos del dueño.
+  for (const viewer of [b, callerFor(null)]) {
+    const other = await viewer.games.get({ id: gameId });
+    assert.equal(other.owner, false);
+    assert.equal(other.exerciseCount, 0);
+  }
+  assert.equal((await callerFor(A).games.get({ id: gameId })).owner, true);
+  await assert.rejects(b.games.get({ id: "nope" }), code("NOT_FOUND"));
   await assert.rejects(b.games.delete({ id: gameId }), code("NOT_FOUND"));
   await assert.rejects(b.games.setUserColor({ id: gameId, color: "b" }), code("NOT_FOUND"));
   await assert.rejects(b.analysis.save({ gameId, analysis: baseAnalysis() }), code("NOT_FOUND"));

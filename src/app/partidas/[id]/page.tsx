@@ -25,6 +25,7 @@ export default function SavedGamePage() {
   const [lastRun, setLastRun] = useState<GameAnalysis | null>(null);
 
   const game = q.data?.game;
+  const owner = !!q.data?.owner;
   const analysis = fresh ?? q.data?.analysis ?? null;
 
   async function persist(a: GameAnalysis) {
@@ -62,16 +63,22 @@ export default function SavedGamePage() {
 
   return (
     <GameReview
-      // Otra `?posicion=` sobre la misma partida (atrás/adelante) vuelve a montar el visor en esa posición.
-      key={pos ?? ""}
       game={game}
       analysis={analysis}
       initialPly={pos && /^\d+$/.test(pos) ? Number(pos) : undefined}
       back={
-        <Link href="/partidas" className="btn-ghost -ml-2 size-9 min-h-9 shrink-0 px-0" aria-label="Volver a Mis partidas">
-          <ChevronLeft className="size-5" />
-        </Link>
+        owner ? (
+          <Link href="/partidas" className="btn-ghost -ml-2 size-9 min-h-9 shrink-0 px-0" aria-label="Volver a Mis partidas">
+            <ChevronLeft className="size-5" />
+          </Link>
+        ) : undefined
       }
+      // La URL sigue la posición (sin entrada nueva en el historial) para poder compartirla tal cual.
+      onPly={(p) => {
+        const u = new URL(window.location.href);
+        u.searchParams.set("posicion", String(p));
+        window.history.replaceState(null, "", u);
+      }}
       liveEvals={state.status === "running" ? liveEvals : undefined}
       actions={
         q.data?.exerciseCount ? (
@@ -81,6 +88,8 @@ export default function SavedGamePage() {
         ) : null
       }
       toolbar={
+        // Quien no es dueño solo ve la partida: no puede analizarla ni guardar.
+        owner && (
         <>
           {analysis && analysis.classifierVersion < CLASSIFIER_VERSION && state.status !== "running" && (
             <p className="w-full rounded-lg bg-raised p-3 text-sm" role="status">
@@ -104,6 +113,7 @@ export default function SavedGamePage() {
             </p>
           )}
         </>
+        )
       }
     />
   );

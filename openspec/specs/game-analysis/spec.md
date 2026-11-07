@@ -31,7 +31,7 @@ La pantalla de análisis SHALL mostrar:
 - el icono de clasificación sobre la casilla de destino y en la lista de jugadas;
 - la precisión de cada jugador y el conteo por clase.
 
-Al abrir una partida, el tablero SHALL estar en la primera jugada (ply 1); ◀ lleva a la posición inicial. Con `?posicion=<ply>` (entero entre 0 y el número de jugadas) SHALL abrir en esa posición; un valor inválido o fuera de rango se ignora.
+Al abrir una partida, el tablero SHALL estar en la primera jugada (ply 1); ◀ lleva a la posición inicial. Con `?posicion=<ply>` (entero entre 0 y el número de jugadas) SHALL abrir en esa posición; un valor inválido o fuera de rango se ignora. Al moverse por la partida, la URL SHALL actualizar `?posicion=` sin agregar entradas al historial, para poder compartir la posición actual.
 
 **Encabezado de `/partidas/<id>`:** SHALL ser compacto: botón atrás de 36 px y, en celular, la franja de jugadas a su derecha. No SHALL repetir el resultado ni los nombres (ya están junto al tablero).
 

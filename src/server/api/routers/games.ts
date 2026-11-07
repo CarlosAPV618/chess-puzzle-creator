@@ -5,9 +5,10 @@ import { z } from "zod";
 import { MAX_GAMES, parseGamePgn } from "~/lib/import/pgn";
 import type { Color, GameAnalysis } from "~/lib/types";
 import { cursorSchema } from "~/server/api/routers/practice";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "~/server/api/trpc";
 import { analyses, exercises, games, playerNames } from "~/server/db/schema";
 import { replayFens } from "~/server/services/analysis";
+import { clientIp } from "~/server/services/client-ip";
 import { enforceRateLimit } from "~/server/services/rate-limit";
 
 export const GAMES_PAGE = 30;
@@ -159,7 +160,11 @@ export const gamesRouter = createTRPCRouter({
     return { items, nextCursor: rows.length === GAMES_PAGE ? offset + GAMES_PAGE : null };
   }),
 
-  get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
+  /** Público: cualquiera con el enlace ve la partida y su análisis; solo el dueño ve `exerciseCount` y puede editarla. */
+  get: publicProcedure.input(z.object({ id: z.string().max(64) })).query(async ({ ctx, input }) => {
+    const viewer = ctx.session?.user.id ?? null;
+    await enforceRateLimit(ctx.db, viewer ? `games.get:user:${viewer}` : `games.get:ip:${clientIp(ctx.headers)}`, 60, 60);
+    if (!z.string().uuid().safeParse(input.id).success) throw notFound();
     const [row] = await ctx.db
       .select({
         game: games,
@@ -168,9 +173,10 @@ export const gamesRouter = createTRPCRouter({
       })
       .from(games)
       .leftJoin(analyses, eq(analyses.gameId, games.id))
-      .where(and(eq(games.id, input.id), eq(games.userId, ctx.session.user.id)));
+      .where(eq(games.id, input.id));
     if (!row) throw notFound();
     const g = row.game;
+    const owner = viewer === g.userId;
     const a = row.analysis;
     const analysis: GameAnalysis | null = a
       ? {
@@ -203,7 +209,8 @@ export const gamesRouter = createTRPCRouter({
         movesSan: g.movesSan,
       },
       analysis,
-      exerciseCount: row.exerciseCount,
+      exerciseCount: owner ? row.exerciseCount : 0,
+      owner,
     };
   }),
 
