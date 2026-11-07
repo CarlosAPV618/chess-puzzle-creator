@@ -13,9 +13,12 @@ const NOT_FOUND = "No encontramos ese ejercicio";
 
 export default function ExercisePage() {
   const { id } = useParams<{ id: string }>();
+  // Llaves: en Chrome `scrollTo` devuelve una Promise y React la tomaría como cleanup ("destroy is not a function").
   // Next no sube si el inicio de la página ya asoma (p. ej. tras bajar un poco para tocar "Siguiente"),
   // y el encabezado fijo tapa la fila de Practicar/Compartir.
-  useEffect(() => window.scrollTo(0, 0), [id]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
   // Con `key`, "Siguiente" empieza con el menú y la imagen limpios.
   return (
     <Suspense>

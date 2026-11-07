@@ -231,12 +231,13 @@ export function ExerciseView({
                       {nextLink.label}
                     </Link>
                   )}
-                  {ex.gameId && (
-                    <Link href={`/partidas/${ex.gameId}`} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
-                      <ExternalLink className="hidden size-4 sm:block" /> Ver partida
-                    </Link>
-                  )}
                 </>
+              )}
+              {/* Solo el dueño recibe gameId; abre la partida en la posición del ejercicio. */}
+              {ex.gameId && (
+                <Link href={`/partidas/${ex.gameId}?posicion=${ex.ply}`} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
+                  <ExternalLink className="hidden size-4 sm:block" /> Ver partida
+                </Link>
               )}
             </div>
           )}

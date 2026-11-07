@@ -2,7 +2,7 @@
 
 import { ChevronLeft, Loader2, Puzzle } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AnalysisControls } from "~/components/analysis-controls";
 import { CLASSIFIER_VERSION } from "~/lib/classify/version";
@@ -14,6 +14,8 @@ import { api } from "~/trpc/react";
 
 export default function SavedGamePage() {
   const { id } = useParams<{ id: string }>();
+  // `?posicion=<ply>`: abre la partida en esa posición (p. ej. desde un ejercicio).
+  const pos = useSearchParams().get("posicion");
   const utils = api.useUtils();
   const q = api.games.get.useQuery({ id }, { refetchOnWindowFocus: false, retry: false });
   const save = api.analysis.save.useMutation();
@@ -62,6 +64,7 @@ export default function SavedGamePage() {
     <GameReview
       game={game}
       analysis={analysis}
+      initialPly={pos && /^\d+$/.test(pos) ? Number(pos) : undefined}
       back={
         <Link href="/partidas" className="btn-ghost -ml-2 size-9 min-h-9 shrink-0 px-0" aria-label="Volver a Mis partidas">
           <ChevronLeft className="size-5" />

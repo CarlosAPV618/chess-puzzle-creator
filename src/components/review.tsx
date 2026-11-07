@@ -70,6 +70,7 @@ export function GameReview({
   toolbar,
   actions,
   back,
+  initialPly,
 }: {
   game: ReviewGame;
   analysis: GameAnalysis | null;
@@ -81,6 +82,8 @@ export function GameReview({
   actions?: ReactNode;
   /** Botón de volver, a la izquierda de la franja de jugadas. */
   back?: ReactNode;
+  /** Posición inicial (`?posicion=` en la URL); si no, la primera jugada. */
+  initialPly?: number;
 }) {
   const { fens, sans } = useMemo(() => replay(game.startFen, game.movesUci), [game.startFen, game.movesUci]);
   const N = game.movesUci.length;
@@ -88,7 +91,7 @@ export function GameReview({
   const colorOf = useCallback((move: number): Color => ((move % 2 === 0) === (firstColor === "w") ? "w" : "b"), [firstColor]);
 
   // Arranca en la primera jugada: así la franja de jugadas ya tiene una activa que deslizar.
-  const [ply, setPly] = useState(N > 0 ? 1 : 0);
+  const [ply, setPly] = useState(() => (initialPly !== undefined && initialPly >= 0 && initialPly <= N ? initialPly : Math.min(N, 1)));
   const [flipped, setFlipped] = useState(false);
   const [variant, setVariant] = useState<{ base: number; moves: string[] } | null>(null);
   const [variantInfo, setVariantInfo] = useState<{ eval?: Eval; best?: string }>({});

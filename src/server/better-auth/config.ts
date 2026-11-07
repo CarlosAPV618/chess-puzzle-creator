@@ -17,6 +17,8 @@ export const auth = betterAuth({
   trustedOrigins: [env.BETTER_AUTH_URL],
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: { enabled: true, requireEmailVerification: false },
+  // Sesión deslizante: dura 60 días y se renueva (cookie incluida) al usarla, como mucho una vez al día.
+  session: { expiresIn: 60 * 60 * 24 * 60, updateAge: 60 * 60 * 24 },
   databaseHooks: {
     user: {
       create: {
