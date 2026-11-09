@@ -148,7 +148,13 @@ export function Board({ id = "board", fen, orientation, onMove, arrows = [], las
                 />
               )}
               {badge?.square === square && (
-                <span key={fen} className="animate-pop pointer-events-none absolute -top-[14%] -right-[14%] z-10 w-[46%]">
+                // En la columna/fila del borde el tablero recorta lo que sobresale: ahí se queda dentro.
+                <span
+                  key={fen}
+                  className={`animate-pop pointer-events-none absolute z-10 w-[46%] ${
+                    square[1] === (orientation === "white" ? "8" : "1") ? "top-0" : "-top-[14%]"
+                  } ${square[0] === (orientation === "white" ? "h" : "a") ? "right-0" : "-right-[14%]"}`}
+                >
                   <ClassIcon cls={badge.cls} size={64} className="h-auto w-full" />
                 </span>
               )}

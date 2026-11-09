@@ -254,6 +254,9 @@ function Session({ list, onExit }: { list: Exercise[]; onExit: () => void }) {
     submit.mutate({ exerciseId: ex.id, ...o }, { onError: (e) => setSaveError(netError(e, "No se pudo guardar el resultado")) });
   }
 
+  // Resueltos: el actual cuenta en cuanto su resultado queda fijado, así el último llena la barra.
+  const solved = i + (results[ex.id] ? 1 : 0);
+
   return (
     <div>
       <div className="mb-2 flex items-center gap-3">
@@ -263,15 +266,15 @@ function Session({ list, onExit }: { list: Exercise[]; onExit: () => void }) {
         <div
           role="progressbar"
           aria-label="Progreso de la sesión"
-          aria-valuenow={i}
+          aria-valuenow={solved}
           aria-valuemin={0}
           aria-valuemax={list.length}
           className="h-2 flex-1 overflow-hidden rounded-full bg-raised"
         >
-          <div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${(i / list.length) * 100}%` }} />
+          <div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${(solved / list.length) * 100}%` }} />
         </div>
         <span className="font-mono text-sm text-muted">
-          {i + 1}/{list.length}
+          {solved}/{list.length}
         </span>
       </div>
       {saveError && <p className="mb-2 text-sm text-[#ffb4a8]">{saveError}</p>}

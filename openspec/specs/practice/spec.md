@@ -69,6 +69,8 @@ La posición (`fen`) y la fase SHALL calcularse en el servidor a partir del PGN.
 
 El orden SHALL ser aleatorio dentro de cada grupo: primero los nuevos y fallados, después los repasos vencidos. Dos sesiones seguidas con los mismos ejercicios disponibles no SHALL dar siempre el mismo orden.
 
+El contador y la barra de progreso SHALL contar los ejercicios ya resueltos: la sesión empieza en 0/10 con la barra vacía, y al fijar el resultado del último marca 10/10 con la barra llena.
+
 Un ejercicio fallado no SHALL repetirse dentro de la misma sesión. Vuelve en la siguiente porque queda con `box = 0`.
 
 La sesión SHALL incluir los tres tipos. Solo SHALL poder filtrarse por "De quién" (todas, mías, de rivales) y por partida; no SHALL haber filtros de tipo, clase ni fase. El botón "Empezar" SHALL estar justo debajo de los filtros.
@@ -78,7 +80,7 @@ La sesión SHALL incluir los tres tipos. Solo SHALL poder filtrarse por "De qui�
 #### Scenario: Ejercicio de error u oportunidad perdida
 - **WHEN** aparece un ejercicio `mistake` o `miss`
 - **THEN** el tablero está orientado al bando que mueve en la posición previa y resalta la última jugada del rival (origen y destino)
-- **AND** muestra el texto "¿Qué era mejor aquí?" sin revelar qué se jugó
+- **AND** muestra el texto "Encuentra el mejor movimiento." sin revelar qué se jugó
 - **AND** si es el primer ply de la partida, no se resalta ninguna jugada
 
 #### Scenario: Ejercicio de brillante
@@ -134,7 +136,7 @@ La misma regla SHALL aplicarse en "Reintentar" y en "Repasar partida", con la ju
 - **THEN** se marca incorrecta y se ofrecen "Reintentar", "Pista" y "Ver solución"
 
 ### Requirement: Explicar el error
-Después de cada respuesta, el sistema SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en una sola fila y en este orden: "Mejor línea", "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente) y "Ver partida" (solo el dueño). "Ver partida" SHALL estar visible en todas las fases del ejercicio (también antes de responder) y SHALL abrir la partida en la posición del ejercicio (`/partidas/<id>?posicion=<ply>`). No SHALL haber "Lo que podía pasar" ni un recuadro con la jugada original de la partida.
+Después de cada respuesta, el sistema SHALL ofrecer "Mejor línea", que el usuario recorre con ◀ ▶ (botones y teclado) sin reproducción automática, y desde donde puede volver a la posición del ejercicio. Los botones SHALL ir en una sola fila y en este orden: "Mejor línea" y "Siguiente" (o "Volver a la lista" en `/practicar/<id>` cuando no hay siguiente). Debajo, en su propia fila, SHALL ir "Ver partida" (solo el dueño) y "Compartir", visibles en todas las fases del ejercicio (también antes de responder), en la sesión y en `/practicar/<id>`. "Ver partida" SHALL abrir la partida en la posición del ejercicio (`/partidas/<id>?posicion=<ply>`). No SHALL haber "Lo que podía pasar" ni un recuadro con la jugada original de la partida.
 
 Tras la respuesta, el tablero SHALL quedarse en la jugada del usuario con el icono de su resultado:
 - si es correcta, el icono de Mejor (o de Brillante en `brilliant`);
@@ -143,7 +145,7 @@ Tras la respuesta, el tablero SHALL quedarse en la jugada del usuario con el ico
 #### Scenario: Correcto sin contradicción
 - **WHEN** el usuario acierta un ejercicio `miss` cuya jugada original fue 11. exd5
 - **THEN** el tablero muestra su jugada con el icono de Mejor junto a "¡Correcto!"
-- **AND** "Mejor línea", "Siguiente" y "Ver partida" quedan en la misma fila
+- **AND** "Mejor línea" y "Siguiente" quedan en una fila, y "Ver partida" y "Compartir" en la de abajo
 
 #### Scenario: Mejor línea a mano
 - **WHEN** el usuario resuelve un ejercicio y toca "Mejor línea"
@@ -259,7 +261,7 @@ Tocar una tarjeta SHALL abrir el ejercicio en `/practicar/<id>`, conservando los
 
 ### Requirement: Ejercicio por URL
 Cada ejercicio SHALL poder abrirse en `/practicar/<id>` y tener un botón "Compartir" con dos opciones:
-- **Enlace:** Web Share API con la URL, o copiarla si no está disponible.
+- **Enlace:** Web Share API con la URL `/practicar/<id>` (también desde la sesión), o copiarla si no está disponible.
 - **Imagen:** un PNG con el logo y el nombre de la app centrados arriba, la posición con un margen pequeño a los lados, orientada al bando que mueve, con coordenadas y la leyenda "Juegan blancas" o "Juegan negras", y nada más. Sin nombres, evaluación, última jugada ni URL.
   - En un dispositivo táctil que puede compartir archivos, SHALL abrirse la hoja nativa de compartir.
   - En los demás casos (escritorio, o si compartir falla), SHALL descargarse `ejercicio.png`.

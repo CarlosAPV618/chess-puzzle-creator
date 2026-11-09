@@ -7,6 +7,7 @@ import { Board } from "~/components/board";
 import { applyUci, prettySan, sanOf, uciFrom, uciTo } from "~/components/chess";
 import { EvalBar } from "~/components/eval-bar";
 import { NavBar } from "~/components/nav-bar";
+import { ShareMenu } from "~/components/share-menu";
 import { REVIEW_ROW_BTN } from "~/components/review";
 import { judgeMove } from "~/hooks/use-engine";
 import { MISS_WIN } from "~/lib/classify";
@@ -158,7 +159,7 @@ export function ExerciseView({
     ? "Había una jugada brillante. Encuéntrala."
     : ex.kind === "brilliant"
       ? "Hay una jugada brillante. Encuéntrala."
-      : "¿Qué era mejor aquí?";
+      : "Encuentra el mejor movimiento.";
 
   return (
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
@@ -233,12 +234,17 @@ export function ExerciseView({
                   )}
                 </>
               )}
+            </div>
+          )}
+          {!line && (
+            <div className="mt-2 flex gap-2">
               {/* Solo el dueño recibe gameId; abre la partida en la posición del ejercicio. */}
               {ex.gameId && (
-                <Link href={`/partidas/${ex.gameId}?posicion=${ex.ply}`} className={`btn-secondary ${REVIEW_ROW_BTN}`}>
-                  <ExternalLink className="hidden size-4 sm:block" /> Ver partida
+                <Link href={`/partidas/${ex.gameId}?posicion=${ex.ply}`} className="btn-secondary flex-1">
+                  <ExternalLink className="size-4" /> Ver partida
                 </Link>
               )}
+              <ShareMenu ex={ex} className="flex-1" />
             </div>
           )}
         </div>
